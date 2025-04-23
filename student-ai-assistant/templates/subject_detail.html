@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}{{ subject.name }} - Student AI Assistant{% endblock %}
+
+{% block header_title %}Subject: {{ subject.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <!-- Two-column layout for larger screens -->
+    <div class="flex flex-col lg:flex-row gap-6">
+        <!-- Left column - Documents Section -->
+        <div class="w-full lg:w-1/3">
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <span class="material-icons text-blue-500 mr-2">description</span>
+                    Documents
+                </h3>
+
+                <!-- Document Upload Section -->
+                <div class="border-t border-gray-200 pt-4 mb-6">
+                    <h4 class="text-md font-medium mb-2">Upload New Document</h4>
+                    <form id="upload-form" class="flex flex-col gap-3">
+                        <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                            <input type="file" id="document-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,.docx,.txt,.md">
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="material-icons text-gray-400 text-3xl mb-2">upload_file</span>
+                                <p class="text-gray-500 text-sm">Drag & drop a file here or click to browse</p>
+                                <p class="text-gray-400 text-xs mt-1">Supported formats: PDF, DOCX, TXT, MD</p>
+                            </div>
+                        </div>
+                        <div id="upload-status" class="hidden">
+                            <div class="bg-blue-100 text-blue-700 p-2 rounded flex items-center">
+                                <span class="material-icons mr-2 text-blue-500 animate-spin">sync</span>
+                                <span id="upload-status-text">Uploading...</span>
+                            </div>
+                        </div>
+                        <button type="submit" id="upload-button" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span class="material-icons mr-2">cloud_upload</span>
+                            <span>Upload Document</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Documents List -->
+                <div>
+                    <h4 class="text-md font-medium mb-2">Uploaded Documents</h4>
+                    <div id="documents-list" class="space-y-3">
+                        {% if subject.documents %}
+                            {% for doc in subject.documents %}
+                                <div class="border rounded-lg p-3 flex items-center">
+                                    <span class="material-icons text-gray-500 mr-3">description</span>
+                                    <div class="flex-1 truncate">
+                                        <p class="font-medium" title="{{ doc.name }}">{{ doc.name }}</p>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center p-4 text-gray-500 border border-gray-200 rounded-lg">
+                                <p>No documents uploaded yet.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column - Chat Section -->
+        <div class="w-full lg:w-2/3 flex flex-col h-[calc(100vh-16rem)]">
+            <div class="bg-white rounded-lg shadow flex-1 flex flex-col">
+                <!-- Chat Header -->
+                <div class="border-b p-4">
+                    <h3 class="text-lg font-semibold flex items-center">
+                        <span class="material-icons text-blue-500 mr-2">chat</span>
+                        Chat with AI about {{ subject.name }}
+                    </h3>
+                    <p class="text-gray-500 text-sm">Ask questions about your uploaded documents.</p>
+                </div>
+
+                <!-- Chat Messages -->
+                <div id="subject-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Welcome Message -->
+                    <div class="chat-message flex">
+                        <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white flex-shrink-0 mr-3">
+                            <span class="material-icons">smart_toy</span>
+                        </div>
+                        <div class="message-content bg-blue-100 p-3 rounded-lg max-w-3xl">
+                            <p>Hello! I'm your {{ subject.name }} subject assistant. Ask me questions about your uploaded documents, and I'll try to help you understand the material better.</p>
+                            {% if not subject.documents %}
+                            <p class="mt-2 text-orange-600">Note: You haven't uploaded any documents yet. Please upload documents to get subject-specific answers.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <!-- Messages will be added dynamically -->
+                </div>
+
+                <!-- Chat Input -->
+                <div class="border-t p-4">
+                    <form id="subject-chat-form" class="flex items-end">
+                        <textarea id="subject-user-input" class="flex-1 border rounded-lg resize-none p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[50px]" placeholder="Type your message here..." rows="2"></textarea>
+                        <button type="submit" class="ml-2 bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-colors">
+                            <span class="material-icons">send</span>
+                        </button>
+                    </form>
+                    <div id="subject-typing-indicator" class="hidden mt-2 text-sm text-gray-500">
+                        <span class="material-icons animate-pulse">more_horiz</span>
+                        <span>AI is thinking...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Document upload functionality
+    const uploadForm = document.getElementById('upload-form');
+    const documentInput = document.getElementById('document-input');
+    const uploadButton = document.getElementById('upload-button');
+    const uploadStatus = document.getElementById('upload-status');
+    const uploadStatusText = document.getElementById('upload-status-text');
+    const documentsList = document.getElementById('documents-list');
+
+    // Show file name when selected
+    documentInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            uploadButton.disabled = false;
+        } else {
+            uploadButton.disabled = true;
+        }
+    });
+
+    // Handle document upload
+    uploadForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (!documentInput.files.length) return;
+
+        const file = documentInput.files[0];
+        const formData = new FormData();
+        formData.append('document', file);
+
+        // Show upload status
+        uploadStatus.classList.remove('hidden');
+        uploadButton.disabled = true;
+
+        // Send file to API
+        fetch('/subjects/{{ subject.id }}/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            uploadStatus.classList.add('hidden');
+            uploadButton.disabled = false;
+            documentInput.value = '';
+
+            // Add document to the list
+            if (documentsList.querySelector('.text-gray-500')) {
+                documentsList.innerHTML = ''; // Remove "No documents" message
+            }
+
+            const docElement = document.createElement('div');
+            docElement.className = 'border rounded-lg p-3 flex items-center';
+            docElement.innerHTML = `
+                <span class="material-icons text-gray-500 mr-3">description</span>
+                <div class="flex-1 truncate">
+                    <p class="font-medium" title="${data.document.name}">${data.document.name}</p>
+                </div>
+            `;
+            documentsList.appendChild(docElement);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            uploadStatus.classList.remove('hidden');
+            uploadStatusText.textContent = 'Error uploading document. Please try again.';
+            uploadStatus.querySelector('.material-icons').classList.remove('animate-spin');
+            uploadStatus.querySelector('.material-icons').textContent = 'error';
+            uploadStatus.classList.remove('bg-blue-100', 'text-blue-700');
+            uploadStatus.classList.add('bg-red-100', 'text-red-700');
+
+            // Reset status after 3 seconds
+            setTimeout(() => {
+                uploadStatus.classList.add('hidden');
+                uploadButton.disabled = false;
+            }, 3000);
+        });
+    });
+
+    // Subject-specific chat functionality
+    const subjectChatForm = document.getElementById('subject-chat-form');
+    const subjectUserInput = document.getElementById('subject-user-input');
+    const subjectChatMessages = document.getElementById('subject-chat-messages');
+    const subjectTypingIndicator = document.getElementById('subject-typing-indicator');
+
+    // Auto resize textarea as user types
+    subjectUserInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // Submit form on Enter key (but allow Shift+Enter for new line)
+    subjectUserInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            subjectChatForm.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Handle form submission for subject chat
+    subjectChatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const message = subjectUserInput.value.trim();
+        if (!message) return;
+
+        // Add user message to chat
+        addMessage(message, 'user');
+
+        // Clear input
+        subjectUserInput.value = '';
+        subjectUserInput.style.height = 'auto';
+
+        // Show typing indicator
+        subjectTypingIndicator.classList.remove('hidden');
+
+        // Scroll to bottom
+        scrollToBottom();
+
+        // Send message to API
+        fetch('/api/subjects/{{ subject.id }}/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: message }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Hide typing indicator
+            subjectTypingIndicator.classList.add('hidden');
+
+            // Add AI response to chat
+            addMessage(data.response, 'ai');
+
+            // Scroll to bottom
+            scrollToBottom();
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            subjectTypingIndicator.classList.add('hidden');
+
+            // Show error message
+            addMessage('Sorry, I encountered an error. Please try again.', 'ai', true);
+            scrollToBottom();
+        });
+    });
+
+    // Function to add message to chat
+    function addMessage(content, sender, isError = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message flex ' + (sender === 'user' ? 'justify-end' : '');
+
+        let iconClass = sender === 'user' ? 'person' : 'smart_toy';
+        let bgColor = sender === 'user' ? 'bg-green-500' : 'bg-blue-500';
+        let messageBg = sender === 'user' ? 'bg-green-100' : 'bg-blue-100';
+
+        if (isError) {
+            messageBg = 'bg-red-100';
+        }
+
+        let avatar = sender === 'user'
+            ? ''
+            : `<div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white flex-shrink-0 mr-3">
+                <span class="material-icons">${iconClass}</span>
+               </div>`;
+
+        messageDiv.innerHTML = `
+            ${sender === 'user' ? '' : avatar}
+            <div class="message-content ${messageBg} p-3 rounded-lg ${sender === 'user' ? 'ml-3' : 'mr-3'} max-w-3xl">
+                <p>${formatMessage(content)}</p>
+            </div>
+            ${sender === 'user' ? `<div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white flex-shrink-0 ml-3">
+                <span class="material-icons">${iconClass}</span>
+               </div>` : ''}
+        `;
+
+        subjectChatMessages.appendChild(messageDiv);
+    }
+
+    // Function to format message content (e.g., handle line breaks)
+    function formatMessage(content) {
+        return content.replace(/\n/g, '<br>');
+    }
+
+    // Function to scroll chat to bottom
+    function scrollToBottom() {
+        subjectChatMessages.scrollTop = subjectChatMessages.scrollHeight;
+    }
+});
+</script>
+{% endblock %}

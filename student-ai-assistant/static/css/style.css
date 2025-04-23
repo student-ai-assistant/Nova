@@ -1,0 +1,112 @@
+/* Custom styles for Student AI Assistant */
+
+/* Fix for sidebar height */
+html, body {
+    height: 100%;
+}
+
+/* Improved chat message styling */
+.chat-message .message-content {
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.chat-message .message-content p + p {
+    margin-top: 0.75rem;
+}
+
+/* Animation for chat messages */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.chat-message {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Improved upload area styling */
+.border-dashed {
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 5px,
+        rgba(0, 0, 0, 0.03) 5px,
+        rgba(0, 0, 0, 0.03) 10px
+    );
+}
+
+/* Typing indicator animation */
+@keyframes blink {
+    0% { opacity: 0.2; }
+    20% { opacity: 1; }
+    100% { opacity: 0.2; }
+}
+
+.animate-pulse {
+    animation: blink 1.4s infinite ease-in-out;
+}
+
+/* Improved file input area styling */
+#document-input:focus + div {
+    outline: 2px solid #3b82f6;
+    outline-offset: -2px;
+}
+
+/* Custom scrollbar for chat areas */
+#chat-messages, #subject-chat-messages {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(107, 114, 128, 0.5) transparent;
+}
+
+#chat-messages::-webkit-scrollbar,
+#subject-chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chat-messages::-webkit-scrollbar-track,
+#subject-chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#chat-messages::-webkit-scrollbar-thumb,
+#subject-chat-messages::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.5);
+    border-radius: 3px;
+}
+
+/* Mobile responsiveness improvements */
+@media (max-width: 640px) {
+    .chat-message .message-content {
+        max-width: 75%;
+    }
+}
+
+/* Ensure sidebar toggle works correctly */
+@media (max-width: 768px) {
+    #sidebar {
+        position: fixed;
+        height: 100%;
+        z-index: 50;
+        transform: translateX(-100%);
+    }
+
+    #sidebar.md\:translate-x-0 {
+        transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 40;
+    }
+}
+
+/* Focus styling for form elements */
+textarea:focus, input:focus, button:focus {
+    outline: none;
+}

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}General Chat - Student AI Assistant{% endblock %}
+
+{% block header_title %}General Chat{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto flex flex-col h-full">
+    <!-- Chat Messages Area -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto mb-4 p-4 bg-white rounded-lg shadow space-y-4">
+        <!-- Welcome Message -->
+        <div class="chat-message flex">
+            <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white flex-shrink-0 mr-3">
+                <span class="material-icons">smart_toy</span>
+            </div>
+            <div class="message-content bg-blue-100 p-3 rounded-lg max-w-3xl">
+                <p>Hello! I'm your Student AI Assistant. How can I help you with your studies today?</p>
+            </div>
+        </div>
+        <!-- Messages will be added here dynamically -->
+    </div>
+
+    <!-- Chat Input Area -->
+    <div class="bg-white p-4 rounded-lg shadow">
+        <form id="chat-form" class="flex items-end">
+            <textarea id="user-input" class="flex-1 border rounded-lg resize-none p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[50px]" placeholder="Type your message here..." rows="2"></textarea>
+            <button type="submit" class="ml-2 bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-colors">
+                <span class="material-icons">send</span>
+            </button>
+        </form>
+        <div id="typing-indicator" class="hidden mt-2 text-sm text-gray-500">
+            <span class="material-icons animate-pulse">more_horiz</span>
+            <span>AI is thinking...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const typingIndicator = document.getElementById('typing-indicator');
+
+    // Auto resize textarea as user types
+    userInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // Submit form on Enter key (but allow Shift+Enter for new line)
+    userInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Handle form submission
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        // Add user message to chat
+        addMessage(message, 'user');
+
+        // Clear input
+        userInput.value = '';
+        userInput.style.height = 'auto';
+
+        // Show typing indicator
+        typingIndicator.classList.remove('hidden');
+
+        // Scroll to bottom
+        scrollToBottom();
+
+        // Send message to API
+        fetch('/api/chat/general', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: message }),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Hide typing indicator
+            typingIndicator.classList.add('hidden');
+
+            // Add AI response to chat
+            addMessage(data.response, 'ai');
+
+            // Scroll to bottom
+            scrollToBottom();
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            typingIndicator.classList.add('hidden');
+
+            // Show error message
+            addMessage('Sorry, I encountered an error. Please try again.', 'ai', true);
+            scrollToBottom();
+        });
+    });
+
+    // Function to add message to chat
+    function addMessage(content, sender, isError = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message flex ' + (sender === 'user' ? 'justify-end' : '');
+
+        let iconClass = sender === 'user' ? 'person' : 'smart_toy';
+        let bgColor = sender === 'user' ? 'bg-green-500' : 'bg-blue-500';
+        let messageBg = sender === 'user' ? 'bg-green-100' : 'bg-blue-100';
+
+        if (isError) {
+            messageBg = 'bg-red-100';
+        }
+
+        let avatar = sender === 'user'
+            ? ''
+            : `<div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white flex-shrink-0 mr-3">
+                <span class="material-icons">${iconClass}</span>
+              </div>`;
+
+        messageDiv.innerHTML = `
+            ${sender === 'user' ? '' : avatar}
+            <div class="message-content ${messageBg} p-3 rounded-lg ${sender === 'user' ? 'ml-3' : 'mr-3'} max-w-3xl">
+                <p>${formatMessage(content)}</p>
+            </div>
+            ${sender === 'user' ? `<div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white flex-shrink-0 ml-3">
+                <span class="material-icons">${iconClass}</span>
+              </div>` : ''}
+        `;
+
+        chatMessages.appendChild(messageDiv);
+    }
+
+    // Function to format message content (e.g., handle line breaks)
+    function formatMessage(content) {
+        return content.replace(/\n/g, '<br>');
+    }
+
+    // Function to scroll chat to bottom
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+});
+</script>
+{% endblock %}

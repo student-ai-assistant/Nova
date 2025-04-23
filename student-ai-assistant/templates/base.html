@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student AI Assistant{% endblock %}</title>
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <div class="flex flex-1">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="bg-blue-800 text-white w-64 flex-shrink-0 transform transition-all duration-300 ease-in-out overflow-y-auto">
+            <div class="p-4">
+                <h1 class="text-2xl font-bold mb-8">Student AI Assistant</h1>
+                <nav>
+                    <ul>
+                        <li class="mb-3">
+                            <a href="{{ url_for('index') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if request.path == url_for('index') %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">chat</span>
+                                <span>General Chat</span>
+                            </a>
+                        </li>
+                        <li class="mb-3">
+                            <a href="{{ url_for('subjects_list') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/subjects' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">book</span>
+                                <span>Subjects</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Bar with collapse button -->
+            <header class="bg-white shadow-sm z-10">
+                <div class="flex items-center p-4">
+                    <button id="sidebar-toggle" class="p-1 mr-4 rounded-full hover:bg-gray-200 focus:outline-none">
+                        <span class="material-icons">menu</span>
+                    </button>
+                    <h2 class="text-xl font-semibold">{% block header_title %}Student AI Assistant{% endblock %}</h2>
+                </div>
+            </header>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages container mx-auto px-4 py-2">
+                        {% for category, message in messages %}
+                            <div class="{{ 'bg-green-100 border-green-500 text-green-700' if category == 'success' else 'bg-red-100 border-red-500 text-red-700' }} border-l-4 p-4 mb-2">
+                                <p>{{ message }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Main Content -->
+            <main class="flex-1 overflow-y-auto p-4">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Sidebar toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.querySelector('.flex-1');
+
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('-translate-x-full');
+                sidebar.classList.toggle('md:translate-x-0');
+                mainContent.classList.toggle('md:ml-64');
+            });
+
+            // Auto-collapse sidebar on mobile
+            function checkWidth() {
+                if (window.innerWidth < 768) {
+                    sidebar.classList.add('-translate-x-full');
+                    mainContent.classList.remove('md:ml-64');
+                } else {
+                    sidebar.classList.remove('-translate-x-full');
+                    mainContent.classList.add('md:ml-64');
+                }
+            }
+
+            // Initial check
+            checkWidth();
+
+            // Check on resize
+            window.addEventListener('resize', checkWidth);
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
