@@ -35,6 +35,12 @@
                                 <span>Subjects</span>
                             </a>
                         </li>
+                        <li class="mb-3">
+                            <a href="{{ url_for('timetable') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/timetable' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">calendar_today</span>
+                                <span>Timetable Generator</span>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>
