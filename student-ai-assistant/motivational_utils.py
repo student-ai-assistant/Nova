@@ -11,8 +11,6 @@ def write_quote_in_json(response_of_ai):
     Will save the date to the quote, so we can track the quotes.
     """
     DATA_FILE = Path("data.json")
-    if quote_written_today():
-        return 
     todaysdate = datetime.today().strftime('%Y-%m-%d')
     try:
         with DATA_FILE.open("r", encoding="utf-8") as f:
@@ -22,7 +20,7 @@ def write_quote_in_json(response_of_ai):
     except (FileNotFoundError, json.JSONDecodeError, ValueError):
         quotes = {}
     if todaysdate in quotes:
-        return 
+        return quotes[todaysdate]
     
     quotes[todaysdate] = response_of_ai 
     with open('data.json', 'w', encoding='utf-8') as f:

@@ -311,11 +311,8 @@ def upload_document(subject_id):
 def api_reading():
     message = "Please Generate a motivational quote depending on the users mode. Send only the quote in double quotation and the guy who said it afterwards -" \
     "+ dont add the following quotes and get new things" + str(get_values())
-    
-    print(str(get_values()))
     response = call_azure_openai(message)
     x = motivational(response)
-    print(x)
     return jsonify(value=x)
 
 @app.route('/api/subjects/<subject_id>/chat', methods=['POST'])
