@@ -17,3 +17,4 @@ dependencies:
     - pdfplumber   # For processing PDF files
     - markdown     # For processing .md files
     - pymongo      # For MongoDB Atlas integration
+    - icalendar    # For generating iCalendar (.ics) files

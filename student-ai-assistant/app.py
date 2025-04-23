@@ -1,11 +1,13 @@
 import os
 import uuid
 import json
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash, send_file, Response
 from werkzeug.utils import secure_filename
 import requests
 import logging
 import os.path
+import datetime
+import io
 
 # Import our utility modules
 from document_processor import extract_document_text, prepare_document_for_indexing
@@ -415,7 +417,7 @@ def retrieve_document_context(subject_id, query):
         logger.error(f"Error retrieving document context: {str(e)}")
         return f"Error retrieving document context: {str(e)}"
 
-# New Timetable Generator Routes
+# Timetable Generator Routes
 
 @app.route('/timetable')
 def timetable():
@@ -435,7 +437,7 @@ def timetable():
 
 @app.route('/api/timetable/extract_topics', methods=['POST'])
 def extract_topics():
-    """API endpoint for extracting topics from subject documents"""
+    """API endpoint for extracting topics from subject documents (Agent 1)"""
     try:
         session_id = get_session_id()
         subject_id = request.json.get('subject_id')
@@ -460,7 +462,7 @@ def extract_topics():
         # Initialize timetable agent system
         timetable_system = get_timetable_agent_system()
 
-        # Extract topics from documents
+        # Extract topics from documents using Agent 1
         extraction_results = timetable_system.extract_topics_from_documents(
             documents=documents,
             upload_folder=app.config['UPLOAD_FOLDER'],
@@ -479,7 +481,7 @@ def extract_topics():
 
 @app.route('/api/timetable/generate', methods=['POST'])
 def generate_timetable():
-    """API endpoint for generating a study timetable"""
+    """API endpoint for generating a study timetable using the multi-agent workflow"""
     try:
         session_id = get_session_id()
         subject_id = request.json.get('subject_id')
@@ -496,13 +498,13 @@ def generate_timetable():
         if subject is None:
             return jsonify({"error": "Subject not found"}), 404
 
-        # Get user's journal entries for context
+        # Get user's journal entries for Agent 3
         user_journal_entries = mongo_client.get_user_journal_entries(session_id, limit=30)
 
         # Initialize timetable agent system
         timetable_system = get_timetable_agent_system()
 
-        # Generate timetable
+        # Generate timetable using the multi-agent workflow
         timetable_results = timetable_system.generate_timetable(
             extracted_topics=extracted_topics,
             journal_entries=user_journal_entries,
@@ -518,6 +520,47 @@ def generate_timetable():
     except Exception as e:
         logger.error(f"Error generating timetable: {str(e)}")
         return jsonify({"error": f"Error generating timetable: {str(e)}"}), 500
+
+@app.route('/api/timetable/download', methods=['POST'])
+def download_timetable():
+    """API endpoint for downloading timetable as iCalendar (.ics) file"""
+    try:
+        timetable_data = request.json.get('timetable_data')
+        subject = request.json.get('subject', {})
+
+        if not timetable_data:
+            return jsonify({"error": "Timetable data is required"}), 400
+
+        # Initialize timetable agent system
+        timetable_system = get_timetable_agent_system()
+
+        # Generate iCalendar file
+        ics_data = timetable_system.generate_ics_calendar(timetable_data)
+
+        # Create in-memory file
+        ics_file = io.BytesIO(ics_data)
+
+        # Prepare the filename
+        subject_name = subject.get('name', 'Study')
+        safe_subject_name = "".join(c for c in subject_name if c.isalnum() or c in [' ', '_', '-']).strip()
+        safe_subject_name = safe_subject_name.replace(' ', '_')
+
+        date_str = datetime.datetime.now().strftime('%Y%m%d')
+        filename = f"{safe_subject_name}_Timetable_{date_str}.ics"
+
+        # Send the file
+        return Response(
+            ics_file.getvalue(),
+            mimetype='text/calendar',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'text/calendar; charset=utf-8'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error downloading timetable: {str(e)}")
+        return jsonify({"error": f"Error downloading timetable: {str(e)}"}), 500
 
 # Clean up resources when app is shutting down
 @app.teardown_appcontext
