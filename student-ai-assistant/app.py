@@ -112,7 +112,7 @@ def general_chat():
             unique_contents = set()
             for info in extracted_info:
                 unique_contents.add(info['content'])
-                
+
             # Only save if we have content
             if unique_contents:
                 # Combine unique content into a single journal entry
@@ -139,15 +139,31 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False):
         # Add context if provided
         if context:
             system_role = 'You are a helpful AI assistant for students.'
+
+            # Add journal functionality information to the system message
             if is_subject_chat:
                 system_role += " Use the following information from documents and previous conversations to answer the student's question. If the answer is not in the provided context, say that you don't have that information."
+                system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific about this subject, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your subject journal for future reference."
             else:
                 system_role += ' Use the following information from previous conversations to provide personalized assistance.'
+                system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your journal for future reference."
+
             system_message = {'role': 'system', 'content': system_role}
             messages.insert(0, system_message)
             # Add context message
             context_message = {'role': 'system', 'content': f'Context information: {context}'}
             messages.insert(1, context_message)
+        else:
+            # Even without context, add information about journal functionality
+            system_role = 'You are a helpful AI assistant for students.'
+            if is_subject_chat:
+                system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific about this subject, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your subject journal for future reference."
+            else:
+                system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your journal for future reference."
+
+            system_message = {'role': 'system', 'content': system_role}
+            messages.insert(0, system_message)
+
         payload = {'messages': messages, 'max_tokens': 800, 'temperature': 0.7, 'top_p': 0.95, 'stream': False}
         # Send request to Azure OpenAI
         headers = {'Content-Type': 'application/json', 'api-key': api_key}
@@ -287,7 +303,7 @@ def subject_chat(subject_id):
             combined_context = 'No relevant information found.'
         # Call Azure OpenAI with the combined context
         response = call_azure_openai(user_message, combined_context, is_subject_chat=True)
-        
+
         # Extract and save important information from user's message only
         extracted_info = JournalExtractor.extract_important_information(user_message)
         if extracted_info:
@@ -295,7 +311,7 @@ def subject_chat(subject_id):
             unique_contents = set()
             for info in extracted_info:
                 unique_contents.add(info['content'])
-                
+
             # Only save if we have content
             if unique_contents:
                 # Combine unique content into a single journal entry
