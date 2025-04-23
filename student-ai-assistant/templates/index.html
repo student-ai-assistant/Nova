@@ -14,7 +14,7 @@
                 <span class="material-icons">smart_toy</span>
             </div>
             <div class="message-content bg-blue-100 p-3 rounded-lg max-w-3xl">
-                <p>Hello! I'm your Student AI Assistant. How can I help you with your studies today?</p>
+                <p id="motivational">Loading…</p>
             </div>
         </div>
         <!-- Messages will be added here dynamically -->
@@ -38,6 +38,16 @@
 
 {% block extra_js %}
 <script>
+
+
+
+fetch("/api/motivational")
+  .then(r => r.json())
+  .then(data => {
+      document.getElementById("motivational").textContent = data.value;
+  })
+  .catch(console.error);
+
 document.addEventListener('DOMContentLoaded', function() {
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');

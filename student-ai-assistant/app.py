@@ -12,7 +12,7 @@ from document_processor import extract_document_text, prepare_document_for_index
 from search_utils import AzureSearchClient, get_relevant_context
 from mongodb_utils import MongoDBClient
 from journal_utils import JournalExtractor
-
+from motivational_utils import motivational , get_values
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -307,6 +307,17 @@ def upload_document(subject_id):
         logger.error(f"Error uploading document: {str(e)}")
         return jsonify({"error": f"Error uploading document: {str(e)}"}), 500
 
+@app.route("/api/motivational")
+def api_reading():
+    message = "Please Generate a motivational quote depending on the users mode. Send only the quote in double quotation and the guy who said it afterwards -" \
+    "+ dont add the following quotes and get new things" + str(get_values())
+    
+    print(str(get_values()))
+    response = call_azure_openai(message)
+    x = motivational(response)
+    print(x)
+    return jsonify(value=x)
+
 @app.route('/api/subjects/<subject_id>/chat', methods=['POST'])
 def subject_chat(subject_id):
     """API endpoint for subject-specific chat functionality"""
@@ -407,3 +418,6 @@ def close_connections(exception=None):
 
 if __name__ == '__main__':
     app.run(debug=app.config['DEBUG'])
+
+
+
