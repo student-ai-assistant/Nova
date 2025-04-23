@@ -10,6 +10,8 @@ import os.path
 # Import our utility modules
 from document_processor import extract_document_text, prepare_document_for_indexing
 from search_utils import AzureSearchClient, get_relevant_context
+from mongodb_utils import MongoDBClient
+from journal_utils import JournalExtractor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,11 +20,18 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
 
+# Configure session
+app.secret_key = app.config['SECRET_KEY']
+# Configure URL handling - this ensures routes work with or without trailing slashes
+app.url_map.strict_slashes = False
+
 # Ensure the upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize Azure Search client (lazy initialization)
 search_client = None
+# Initialize MongoDB client (lazy initialization)
+mongodb_client = None
 
 def get_search_client():
     """Get or initialize the Azure Search client"""
@@ -35,12 +44,27 @@ def get_search_client():
         )
     return search_client
 
+def get_mongodb_client():
+    """Get or initialize the MongoDB client"""
+    global mongodb_client
+    if mongodb_client is None:
+        mongodb_client = MongoDBClient(
+            uri=app.config['MONGODB_URI'],
+            db_name=app.config['MONGODB_DB_NAME']
+        )
+        # Try to establish connection
+        mongodb_client.connect()
+    return mongodb_client
+
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-# Initialize in-memory database for subjects (in a real app, use a proper database)
-subjects = []
+# Helper function to get or create a session ID
+def get_session_id():
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+    return session['session_id']
 
 # Routes
 @app.route('/')
@@ -52,19 +76,42 @@ def index():
 def general_chat():
     """API endpoint for the general chat functionality"""
     try:
+        session_id = get_session_id()
         user_message = request.json.get('message', '')
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
 
-        # Call Azure OpenAI API
-        response = call_azure_openai(user_message)
+        # Retrieve memory journal entries for context
+        mongo_client = get_mongodb_client()
+        user_journal_entries = mongo_client.get_user_journal_entries(session_id)
+        user_memory_context = JournalExtractor.get_memory_context(user_journal_entries)
+        
+        # Retrieve all subject journal entries for additional context
+        subject_journal_entries = mongo_client.get_all_subject_journal_entries(session_id)
+        subject_memory_context = JournalExtractor.get_memory_context(subject_journal_entries, max_entries=10)
+        
+        # Combine both contexts
+        combined_context = ""
+        if user_memory_context:
+            combined_context += "User's General Memory:\n" + user_memory_context + "\n\n"
+        if subject_memory_context:
+            combined_context += "User's Subject-Specific Memory:\n" + subject_memory_context
+            
+        # Call Azure OpenAI API with combined memory context
+        response = call_azure_openai(user_message, combined_context, is_subject_chat=False)
+
+        # Extract and save important information from the user's message
+        extracted_info = JournalExtractor.extract_important_information(user_message)
+        for info in extracted_info:
+            entry_data = JournalExtractor.prepare_journal_entry(info['content'], session_id)
+            mongo_client.add_user_journal_entry(entry_data)
 
         return jsonify({"response": response})
     except Exception as e:
         logger.error(f"Error in general chat: {str(e)}")
         return jsonify({"error": "An error occurred processing your request"}), 500
 
-def call_azure_openai(user_message, context=None):
+def call_azure_openai(user_message, context=None, is_subject_chat=False):
     """Call Azure OpenAI API with user message and optional context"""
     try:
         endpoint = app.config['AZURE_OPENAI_ENDPOINT']
@@ -78,11 +125,18 @@ def call_azure_openai(user_message, context=None):
         # Prepare the request payload
         messages = [{"role": "user", "content": user_message}]
 
-        # Add context if provided (for subject-specific chat)
+        # Add context if provided
         if context:
+            system_role = "You are a helpful AI assistant for students."
+            
+            if is_subject_chat:
+                system_role += " Use the following information from documents and previous conversations to answer the student's question. If the answer is not in the provided context, say that you don't have that information."
+            else:
+                system_role += " Use the following information from previous conversations to provide personalized assistance."
+                
             system_message = {
                 "role": "system",
-                "content": "You are a helpful AI assistant for students. Use the following information to answer the student's question. If the answer is not in the provided context, say that you don't have that information."
+                "content": system_role
             }
             messages.insert(0, system_message)
 
@@ -119,48 +173,73 @@ def call_azure_openai(user_message, context=None):
 @app.route('/subjects')
 def subjects_list():
     """Render the subjects page with a list of subjects"""
+    session_id = get_session_id()
+    
+    # Get subjects from MongoDB
+    mongo_client = get_mongodb_client()
+    subjects = mongo_client.get_subjects(session_id)
+    
+    # Fetch documents for each subject to display accurate document counts
+    for subject in subjects:
+        documents = mongo_client.get_subject_documents(subject['_id'])
+        subject['documents'] = documents
+    
     return render_template('subjects.html', subjects=subjects)
 
 @app.route('/subjects/add', methods=['POST'])
 def add_subject():
     """Add a new subject"""
+    session_id = get_session_id()
     subject_name = request.form.get('subject_name')
 
     if not subject_name:
         flash('Subject name is required', 'error')
         return redirect(url_for('subjects_list'))
 
-    # Generate a unique ID for the subject
-    subject_id = str(uuid.uuid4())
-
-    # Create a new subject
-    subject = {
-        'id': subject_id,
+    # Create a new subject in MongoDB
+    mongo_client = get_mongodb_client()
+    subject_data = {
         'name': subject_name,
-        'documents': []
+        'session_id': session_id,
     }
-
-    subjects.append(subject)
-    flash(f'Subject "{subject_name}" added successfully', 'success')
+    
+    subject_id = mongo_client.create_subject(subject_data)
+    
+    if subject_id:
+        flash(f'Subject "{subject_name}" added successfully', 'success')
+    else:
+        flash('Failed to add subject', 'error')
 
     return redirect(url_for('subjects_list'))
 
 @app.route('/subjects/<subject_id>')
 def subject_detail(subject_id):
     """Render the subject detail page"""
-    subject = next((s for s in subjects if s['id'] == subject_id), None)
-
+    session_id = get_session_id()
+    
+    # Get subject from MongoDB
+    mongo_client = get_mongodb_client()
+    subject = mongo_client.get_subject(subject_id)
+    
     if subject is None:
         flash('Subject not found', 'error')
         return redirect(url_for('subjects_list'))
+    
+    # Get document metadata from MongoDB
+    documents = mongo_client.get_subject_documents(subject_id)
+    subject['documents'] = documents
 
     return render_template('subject_detail.html', subject=subject)
 
 @app.route('/subjects/<subject_id>/upload', methods=['POST'])
 def upload_document(subject_id):
     """Upload a document for a specific subject"""
-    subject = next((s for s in subjects if s['id'] == subject_id), None)
-
+    session_id = get_session_id()
+    
+    # Get subject from MongoDB
+    mongo_client = get_mongodb_client()
+    subject = mongo_client.get_subject(subject_id)
+    
     if subject is None:
         return jsonify({"error": "Subject not found"}), 404
 
@@ -187,21 +266,26 @@ def upload_document(subject_id):
         # Save the file
         file.save(file_path)
 
-        # Add document info to subject
-        document_info = {
-            'id': str(uuid.uuid4()),
-            'name': filename,
-            'path': unique_filename,
-            'subject_id': subject_id
+        # Add document metadata to MongoDB
+        document_data = {
+            'filename': filename,
+            'storage_path': unique_filename,
+            'subject_id': subject_id,
+            'session_id': session_id,
+            'size': os.path.getsize(file_path)
         }
-        subject['documents'].append(document_info)
+        
+        document_id = mongo_client.add_document_metadata(document_data)
+        
+        if document_id:
+            document_data['_id'] = document_id
 
         # Process and index the document in Azure AI Search if available
         if app.config.get('AZURE_SEARCH_ENDPOINT') and app.config.get('AZURE_SEARCH_API_KEY'):
             try:
                 # Prepare the document for indexing
                 documents = prepare_document_for_indexing(
-                    doc_info=document_info,
+                    doc_info=document_data,
                     subject_name=subject['name'],
                     file_path=file_path
                 )
@@ -215,7 +299,7 @@ def upload_document(subject_id):
                 logger.error(f"Error indexing document: {str(e)}")
                 # Continue without failing if indexing fails
 
-        return jsonify({"success": True, "message": "Document uploaded successfully", "document": document_info})
+        return jsonify({"success": True, "message": "Document uploaded successfully", "document": document_data})
 
     except Exception as e:
         logger.error(f"Error uploading document: {str(e)}")
@@ -225,8 +309,12 @@ def upload_document(subject_id):
 def subject_chat(subject_id):
     """API endpoint for subject-specific chat functionality"""
     try:
-        subject = next((s for s in subjects if s['id'] == subject_id), None)
-
+        session_id = get_session_id()
+        
+        # Verify subject exists in MongoDB
+        mongo_client = get_mongodb_client()
+        subject = mongo_client.get_subject(subject_id)
+        
         if subject is None:
             return jsonify({"error": "Subject not found"}), 404
 
@@ -235,10 +323,44 @@ def subject_chat(subject_id):
             return jsonify({"error": "No message provided"}), 400
 
         # Use Azure AI Search to retrieve relevant document chunks as context
-        context = retrieve_document_context(subject_id, user_message)
+        document_context = retrieve_document_context(subject_id, user_message)
+        
+        # Retrieve subject journal entries for additional context
+        journal_entries = mongo_client.get_subject_journal_entries(session_id, subject_id)
+        journal_context = JournalExtractor.get_memory_context(journal_entries)
+        
+        # Combine document and journal context with better formatting
+        combined_context = ""
+        
+        if document_context:
+            combined_context += "### DOCUMENT INFORMATION ###\n" + document_context + "\n\n"
+        
+        if journal_context:
+            combined_context += "### PREVIOUS CONVERSATION INFORMATION ###\n" + journal_context + "\n\n"
+            
+        # Add a instruction if both contexts are present
+        if document_context and journal_context:
+            combined_context += "Please use both document information and previous conversation context to provide a comprehensive answer.\n\n"
+        # Add a title for empty context
+        elif not combined_context:
+            combined_context = "No relevant information found."
 
-        # Call Azure OpenAI with the context
-        response = call_azure_openai(user_message, context)
+        # Call Azure OpenAI with the combined context
+        response = call_azure_openai(user_message, combined_context, is_subject_chat=True)
+
+        # Extract and save important information from user's message and AI's response
+        extracted_info = JournalExtractor.extract_important_information(user_message)
+        for info in extracted_info:
+            entry_data = JournalExtractor.prepare_journal_entry(info['content'], session_id, subject_id)
+            mongo_client.add_subject_journal_entry(entry_data)
+            
+        # Also extract potential important information from AI's response
+        ai_extracted_info = JournalExtractor.extract_important_information(response)
+        for info in ai_extracted_info:
+            if JournalExtractor.should_save_ai_response(info):
+                entry_data = JournalExtractor.prepare_journal_entry(
+                    f"AI noted: {info['content']}", session_id, subject_id)
+                mongo_client.add_subject_journal_entry(entry_data)
 
         return jsonify({"response": response})
 
@@ -257,26 +379,35 @@ def retrieve_document_context(subject_id, query):
             return get_relevant_context(search_client, query, subject_id)
 
         # Fall back to basic context if no Azure Search
-        subject = next((s for s in subjects if s['id'] == subject_id), None)
-        if subject is None or not subject['documents']:
+        mongo_client = get_mongodb_client()
+        documents = mongo_client.get_subject_documents(subject_id)
+        
+        if not documents:
             return "No documents available for this subject yet."
 
         # Get a sample of content from the first document
-        if subject['documents']:
-            doc = subject['documents'][0]
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], doc['path'])
+        if documents:
+            doc = documents[0]
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], doc['storage_path'])
             if os.path.exists(file_path):
                 text = extract_document_text(file_path)
                 if text:
                     # Return a sample of the text (first 500 characters)
                     sample = text[:500] + "..." if len(text) > 500 else text
-                    return f"Sample from {doc['name']}:\n\n{sample}\n\nNote: In a production environment, a more sophisticated document retrieval system would be used."
+                    return f"Sample from {doc['filename']}:\n\n{sample}\n\nNote: In a production environment, a more sophisticated document retrieval system would be used."
 
         return "Document content could not be retrieved. This is a development version without proper Azure AI Search integration."
 
     except Exception as e:
         logger.error(f"Error retrieving document context: {str(e)}")
         return f"Error retrieving document context: {str(e)}"
+
+# Clean up resources when app is shutting down
+@app.teardown_appcontext
+def close_connections(exception=None):
+    global mongodb_client
+    if mongodb_client:
+        mongodb_client.close()
 
 if __name__ == '__main__':
     app.run(debug=app.config['DEBUG'])

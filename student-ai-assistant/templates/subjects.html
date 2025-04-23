@@ -35,13 +35,17 @@
         {% if subjects %}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for subject in subjects %}
-                    <a href="{{ url_for('subject_detail', subject_id=subject.id) }}" class="block bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow">
+                    <a href="{{ url_for('subject_detail', subject_id=subject._id) }}" class="block bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow">
                         <div class="p-6 flex items-start">
                             <span class="material-icons text-blue-500 mr-4 text-3xl">book</span>
                             <div class="flex-1">
                                 <h4 class="font-semibold text-lg text-gray-800">{{ subject.name }}</h4>
                                 <p class="text-sm text-gray-500 mt-1">
-                                    {{ subject.documents|length }} document{{ "s" if subject.documents|length != 1 else "" }} uploaded
+                                    {% if subject.documents %}
+                                        {{ subject.documents|length }} document{{ "s" if subject.documents|length != 1 else "" }} uploaded
+                                    {% else %}
+                                        0 documents uploaded
+                                    {% endif %}
                                 </p>
                                 <div class="mt-3 text-blue-500 text-sm flex items-center">
                                     <span class="material-icons mr-1 text-sm">arrow_forward</span>

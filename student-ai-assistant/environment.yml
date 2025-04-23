@@ -16,3 +16,4 @@ dependencies:
     - python-docx  # For processing .docx files
     - pdfplumber   # For processing PDF files
     - markdown     # For processing .md files
+    - pymongo      # For MongoDB Atlas integration

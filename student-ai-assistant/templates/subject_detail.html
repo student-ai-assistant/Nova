@@ -45,12 +45,12 @@
                 <div>
                     <h4 class="text-md font-medium mb-2">Uploaded Documents</h4>
                     <div id="documents-list" class="space-y-3">
-                        {% if subject.documents %}
+                        {% if subject.documents and subject.documents|length > 0 %}
                             {% for doc in subject.documents %}
                                 <div class="border rounded-lg p-3 flex items-center">
                                     <span class="material-icons text-gray-500 mr-3">description</span>
                                     <div class="flex-1 truncate">
-                                        <p class="font-medium" title="{{ doc.name }}">{{ doc.name }}</p>
+                                        <p class="font-medium" title="{{ doc.filename }}">{{ doc.filename }}</p>
                                     </div>
                                 </div>
                             {% endfor %}
@@ -123,6 +123,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadStatusText = document.getElementById('upload-status-text');
     const documentsList = document.getElementById('documents-list');
 
+    // Debug: Verify subject ID
+    console.log("Subject ID:", "{{ subject._id }}");
+
     // Show file name when selected
     documentInput.addEventListener('change', function() {
         if (this.files.length > 0) {
@@ -146,14 +149,31 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadStatus.classList.remove('hidden');
         uploadButton.disabled = true;
 
-        // Send file to API
-        fetch('/subjects/{{ subject.id }}/upload', {
+        // Get the subject ID directly from the template - ensure it's not empty
+        const subjectId = "{{ subject._id }}";
+        
+        if (!subjectId || subjectId === "None" || subjectId === "") {
+            console.error("Subject ID is missing or invalid:", subjectId);
+            uploadStatus.classList.remove('hidden');
+            uploadStatusText.textContent = 'Error: Subject ID is missing. Please refresh the page and try again.';
+            uploadStatus.querySelector('.material-icons').classList.remove('animate-spin');
+            uploadStatus.querySelector('.material-icons').textContent = 'error';
+            uploadStatus.classList.remove('bg-blue-100', 'text-blue-700');
+            uploadStatus.classList.add('bg-red-100', 'text-red-700');
+            return;
+        }
+        
+        // Send file to API with confirmed subject ID
+        const uploadUrl = `/subjects/${subjectId}/upload`;
+        console.log("Uploading to:", uploadUrl);
+        
+        fetch(uploadUrl, {
             method: 'POST',
             body: formData
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Network response was not ok: ${response.status} ${response.statusText}`);
             }
             return response.json();
         })
@@ -172,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
             docElement.innerHTML = `
                 <span class="material-icons text-gray-500 mr-3">description</span>
                 <div class="flex-1 truncate">
-                    <p class="font-medium" title="${data.document.name}">${data.document.name}</p>
+                    <p class="font-medium" title="${data.document.filename}">${data.document.filename}</p>
                 </div>
             `;
             documentsList.appendChild(docElement);
@@ -234,8 +254,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Scroll to bottom
         scrollToBottom();
 
-        // Send message to API
-        fetch('/api/subjects/{{ subject.id }}/chat', {
+        // Send message to API - Fixed URL by using _id instead of id
+        fetch('/api/subjects/{{ subject._id }}/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
