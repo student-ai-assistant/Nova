@@ -28,6 +28,6 @@ MONGODB_USER_JOURNALS_COLLECTION = os.getenv('MONGODB_USER_JOURNALS_COLLECTION',
 MONGODB_SUBJECT_JOURNALS_COLLECTION = os.getenv('MONGODB_SUBJECT_JOURNALS_COLLECTION', 'subject_journals')
 
 # File upload configuration
-MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max upload size
+MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50 MB max upload size
 UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'subject_documents'))
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'txt', 'md'}

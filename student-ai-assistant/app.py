@@ -106,6 +106,8 @@ def general_chat():
             entry_data = JournalExtractor.prepare_journal_entry(info['content'], session_id)
             mongo_client.add_user_journal_entry(entry_data)
 
+        # No longer saving AI responses to the journal
+
         return jsonify({"response": response})
     except Exception as e:
         logger.error(f"Error in general chat: {str(e)}")
@@ -348,19 +350,13 @@ def subject_chat(subject_id):
         # Call Azure OpenAI with the combined context
         response = call_azure_openai(user_message, combined_context, is_subject_chat=True)
 
-        # Extract and save important information from user's message and AI's response
+        # Extract and save important information from user's message only
         extracted_info = JournalExtractor.extract_important_information(user_message)
         for info in extracted_info:
             entry_data = JournalExtractor.prepare_journal_entry(info['content'], session_id, subject_id)
             mongo_client.add_subject_journal_entry(entry_data)
-            
-        # Also extract potential important information from AI's response
-        ai_extracted_info = JournalExtractor.extract_important_information(response)
-        for info in ai_extracted_info:
-            if JournalExtractor.should_save_ai_response(info):
-                entry_data = JournalExtractor.prepare_journal_entry(
-                    f"AI noted: {info['content']}", session_id, subject_id)
-                mongo_client.add_subject_journal_entry(entry_data)
+        
+        # No longer saving AI responses to the journal
 
         return jsonify({"response": response})
 

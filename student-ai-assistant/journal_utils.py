@@ -60,29 +60,56 @@ class JournalExtractor:
             
         content = info.get('content', '').lower()
         
-        # Check for AI-specific important keywords
+        # Skip very short content or generic negative responses
+        if len(content.split()) < 5 or content.startswith("i don't know") or "no information" in content:
+            return False
+            
+        # Check for AI-specific important keywords (high priority)
         for keyword in JournalExtractor.AI_IMPORTANT_KEYWORDS:
             if keyword.lower() in content:
+                logger.info(f"Saving AI response with important keyword: {keyword}")
                 return True
                 
-        # Check for educational content markers
+        # Check for educational content markers (high priority)
         educational_markers = [
             "definition:", "formula:", "equation:", "theorem:", "principle:",
             "concept:", "method:", "approach:", "technique:", "strategy:",
-            "rule:", "law:", "theory:", "hypothesis:", "conclusion:"
+            "rule:", "law:", "theory:", "hypothesis:", "conclusion:", "example:",
+            "step 1", "step 2", "first,", "second,", "third,", "finally,",
+            "remember:", "note:", "tip:", "hint:"
         ]
         
         for marker in educational_markers:
             if marker in content:
+                logger.info(f"Saving AI response with educational marker: {marker}")
                 return True
                 
-        # Don't save very short or generic responses
-        if len(content.split()) < 5 or content.startswith("i don't know") or "no information" in content:
-            return False
-            
+        # Check for sentences with factual statements (medium priority)
+        factual_indicators = [
+            " is ", " are ", " was ", " were ", " has ", " have ",
+            " can ", " will ", " should ", " must ", " means ", " refers to ",
+            " consists of ", " contains ", " includes ", " represents ",
+            " equals ", " equals to ", " is equal to ", " is defined as "
+        ]
+        
+        # If it's a relatively long, possibly detailed explanation 
+        # that contains factual indicators, save it
+        if len(content.split()) > 15:
+            for indicator in factual_indicators:
+                if indicator in content:
+                    logger.info(f"Saving longer AI response with factual indicator: {indicator}")
+                    return True
+                
         # Check if the content has a keyword from the regular important keywords list
         for keyword in JournalExtractor.IMPORTANT_KEYWORDS:
             if keyword.lower() in content:
+                logger.info(f"Saving AI response with general keyword: {keyword}")
+                return True
+                
+        # Additional heuristic: Save content that appears to be structured knowledge
+        if any(char in content for char in [':', '-', '•', '*', '1.', '2.']):
+            if len(content.split('\n')) > 1 or len(content.split()) > 20:
+                logger.info("Saving AI response with structured content")
                 return True
                 
         return False
