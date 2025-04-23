@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyMate</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans">
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <aside class="w-16 bg-white shadow-lg flex flex-col items-center py-6 space-y-6">
+      <button title="Dashboard">🏠</button>
+      <button title="Subjects">📚</button>
+      <button title="Journal">📓</button>
+      <button title="Settings">⚙️</button>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 p-8 space-y-6 overflow-y-auto">
+      <!-- Greeting -->
+      <h1 class="text-2xl font-bold">Hi, welcome back 👋</h1>
+
+      <!-- Input Box -->
+      <div class="bg-white p-4 rounded-xl shadow flex items-center">
+        <input
+          type="text"
+          placeholder="Ask StudyMate anything..."
+          class="flex-1 outline-none text-lg px-2"
+        />
+        <button class="ml-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+          Send
+        </button>
+      </div>
+
+      <!-- Suggested Prompts -->
+      <div>
+        <h2 class="font-semibold mb-2">Suggestions:</h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <button class="bg-white p-4 rounded-lg shadow hover:bg-gray-50">
+            📌 Summarize today’s lecture
+          </button>
+          <button class="bg-white p-4 rounded-lg shadow hover:bg-gray-50">
+            📥 Upload a file to analyze
+          </button>
+          <button class="bg-white p-4 rounded-lg shadow hover:bg-gray-50">
+            🧪 Create a quiz based on Module 2
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Cards -->
+      <div>
+        <h2 class="font-semibold mb-2">Quick Actions:</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-blue-100 p-4 rounded-xl">
+            <h3 class="text-lg font-semibold">Upload Lecture Notes</h3>
+            <p class="text-sm">PDF or DOC</p>
+          </div>
+          <div class="bg-green-100 p-4 rounded-xl">
+            <h3 class="text-lg font-semibold">Summarize Notes</h3>
+            <p class="text-sm">Get a bullet-point summary</p>
+          </div>
+          <div class="bg-yellow-100 p-4 rounded-xl">
+            <h3 class="text-lg font-semibold">Generate Test</h3>
+            <p class="text-sm">Practice quiz for exams</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
