@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}Timetable Generator | Student AI Assistant{% endblock %}
+
+{% block header_title %}Timetable Generator{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-5xl">
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h1 class="text-2xl font-bold mb-4">Study Timetable Generator</h1>
+        <p class="text-gray-600 mb-6">
+            Use AI to generate a personalized study timetable based on your selected subject materials and your available timeframe.
+            The system will analyze your documents and consider any commitments in your journal to create a tailored study plan.
+        </p>
+
+        <form id="timetableForm" class="space-y-6">
+            <!-- Subject Selection -->
+            <div>
+                <label for="subject" class="block text-sm font-medium text-gray-700 mb-2">Select Subject</label>
+                <select id="subject" name="subject" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Select a subject</option>
+                    {% for subject in subjects %}
+                    <option value="{{ subject._id }}">{{ subject.name }} ({{ subject.documents|length }} documents)</option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-sm text-gray-500">Choose the subject you want to study</p>
+            </div>
+
+            <!-- Study Scope -->
+            <div>
+                <label for="scope" class="block text-sm font-medium text-gray-700 mb-2">Study Focus/Scope</label>
+                <textarea id="scope" name="scope" rows="3" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                <p class="mt-1 text-sm text-gray-500">Describe what specific topics or areas you want to focus on (e.g., "Chapters 3-5" or "Light Transport and Surfaces")</p>
+            </div>
+
+            <!-- Timeframe -->
+            <div>
+                <label for="timeframe" class="block text-sm font-medium text-gray-700 mb-2">Study Timeframe</label>
+                <input type="text" id="timeframe" name="timeframe" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                <p class="mt-1 text-sm text-gray-500">Specify your target timeframe (e.g., "next 2 weeks", "by Friday", "3 days")</p>
+            </div>
+
+            <!-- Submit Button -->
+            <div>
+                <button type="submit" id="generateBtn" class="py-2 px-4 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white w-full transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
+                    Generate Study Timetable
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Processing Indicator (hidden by default) -->
+    <div id="processingIndicator" class="hidden bg-white rounded-lg shadow-md p-6 mb-8">
+        <div class="flex flex-col items-center space-y-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <p id="processingStatus" class="text-lg text-gray-700">Analyzing documents...</p>
+        </div>
+    </div>
+
+    <!-- Results Section (hidden by default) -->
+    <div id="resultsSection" class="hidden">
+        <!-- Topic Extraction Results -->
+        <div id="topicsSection" class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="material-icons mr-2 text-blue-500">format_list_bulleted</span>
+                Extracted Topics
+            </h2>
+            <div id="topicsContent" class="space-y-4">
+                <!-- Topics will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Timetable Results -->
+        <div id="timetableSection" class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="material-icons mr-2 text-blue-500">calendar_today</span>
+                Your Study Timetable
+            </h2>
+
+            <!-- Overview -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Overview</h3>
+                <div id="timetableOverview" class="text-gray-700 p-4 bg-blue-50 rounded-md"></div>
+            </div>
+
+            <!-- Study Sessions -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-2">Study Sessions</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-600 text-sm uppercase">Day</th>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-600 text-sm uppercase">Time</th>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-600 text-sm uppercase">Topics</th>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-600 text-sm uppercase">Activities</th>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-600 text-sm uppercase">Duration</th>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-600 text-sm uppercase">Priority</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timetableBody">
+                            <!-- Timetable entries will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Suggestions -->
+            <div>
+                <h3 class="text-lg font-semibold mb-2">Study Tips & Suggestions</h3>
+                <ul id="suggestionsList" class="list-disc pl-5 space-y-2 text-gray-700">
+                    <!-- Suggestions will be inserted here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const timetableForm = document.getElementById('timetableForm');
+    const generateBtn = document.getElementById('generateBtn');
+    const processingIndicator = document.getElementById('processingIndicator');
+    const processingStatus = document.getElementById('processingStatus');
+    const resultsSection = document.getElementById('resultsSection');
+    const topicsSection = document.getElementById('topicsSection');
+    const topicsContent = document.getElementById('topicsContent');
+    const timetableSection = document.getElementById('timetableSection');
+    const timetableOverview = document.getElementById('timetableOverview');
+    const timetableBody = document.getElementById('timetableBody');
+    const suggestionsList = document.getElementById('suggestionsList');
+
+    timetableForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Get form values
+        const subjectId = document.getElementById('subject').value;
+        const scope = document.getElementById('scope').value;
+        const timeframe = document.getElementById('timeframe').value;
+
+        // Validate inputs
+        if (!subjectId) {
+            alert('Please select a subject.');
+            return;
+        }
+
+        if (!timeframe) {
+            alert('Please specify a timeframe for your study plan.');
+            return;
+        }
+
+        // Show processing indicator and hide results
+        timetableForm.classList.add('opacity-50', 'pointer-events-none');
+        generateBtn.disabled = true;
+        processingIndicator.classList.remove('hidden');
+        resultsSection.classList.add('hidden');
+
+        try {
+            // Step 1: Extract topics
+            processingStatus.textContent = "Analyzing documents and extracting topics...";
+            const topicsResponse = await fetch(`/api/timetable/extract_topics`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    subject_id: subjectId,
+                    scope: scope
+                })
+            });
+
+            if (!topicsResponse.ok) {
+                const error = await topicsResponse.json();
+                throw new Error(error.error || 'Failed to extract topics');
+            }
+
+            const topicsData = await topicsResponse.json();
+
+            // Display extracted topics
+            displayTopics(topicsData.extraction_results.topics);
+
+            // Step 2: Generate timetable
+            processingStatus.textContent = "Creating your personalized study timetable...";
+            const timetableResponse = await fetch(`/api/timetable/generate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    subject_id: subjectId,
+                    extracted_topics: topicsData.extraction_results,
+                    timeframe: timeframe
+                })
+            });
+
+            if (!timetableResponse.ok) {
+                const error = await timetableResponse.json();
+                throw new Error(error.error || 'Failed to generate timetable');
+            }
+
+            const timetableData = await timetableResponse.json();
+
+            // Display timetable
+            displayTimetable(timetableData.timetable_results);
+
+            // Show results
+            resultsSection.classList.remove('hidden');
+
+        } catch (error) {
+            console.error('Error generating timetable:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            // Hide processing indicator and re-enable form
+            processingIndicator.classList.add('hidden');
+            timetableForm.classList.remove('opacity-50', 'pointer-events-none');
+            generateBtn.disabled = false;
+        }
+    });
+
+    function displayTopics(topics) {
+        topicsContent.innerHTML = '';
+
+        // Main topics
+        if (topics.main_topics && topics.main_topics.length > 0) {
+            const mainTopicsDiv = document.createElement('div');
+            mainTopicsDiv.innerHTML = `
+                <h3 class="font-semibold text-blue-800 mb-2">Main Topics</h3>
+                <ul class="list-disc pl-5 mb-4">
+                    ${topics.main_topics.map(topic => `<li class="mb-1">${topic}</li>`).join('')}
+                </ul>
+            `;
+            topicsContent.appendChild(mainTopicsDiv);
+        }
+
+        // Subtopics (if available)
+        if (topics.subtopics && Object.keys(topics.subtopics).length > 0) {
+            const subtopicsDiv = document.createElement('div');
+            subtopicsDiv.innerHTML = `
+                <h3 class="font-semibold text-blue-800 mb-2">Subtopics</h3>
+                <div class="space-y-3">
+                    ${Object.entries(topics.subtopics).map(([topic, subtopics]) => `
+                        <div class="mb-2">
+                            <h4 class="font-medium">${topic}</h4>
+                            <ul class="list-circle pl-5">
+                                ${subtopics.map(subtopic => `<li class="text-sm">${subtopic}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            topicsContent.appendChild(subtopicsDiv);
+        }
+
+        // Key terms (if available)
+        if (topics.key_terms && Object.keys(topics.key_terms).length > 0) {
+            const keyTermsDiv = document.createElement('div');
+            keyTermsDiv.innerHTML = `
+                <h3 class="font-semibold text-blue-800 mb-2">Key Terms & Concepts</h3>
+                <div class="space-y-3">
+                    ${Object.entries(topics.key_terms).map(([topic, terms]) => `
+                        <div class="mb-2">
+                            <h4 class="font-medium">${topic}</h4>
+                            <ul class="list-disc pl-5">
+                                ${terms.map(term => `<li class="text-sm">${term}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            topicsContent.appendChild(keyTermsDiv);
+        }
+    }
+
+    function displayTimetable(timetableData) {
+        // Display overview
+        timetableOverview.textContent = timetableData.overview || "Study plan created based on your documents and timeframe.";
+
+        // Display timetable entries
+        timetableBody.innerHTML = '';
+        if (timetableData.timetable && timetableData.timetable.length > 0) {
+            timetableData.timetable.forEach(session => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-200 hover:bg-gray-50';
+
+                // Set priority color
+                let priorityColor = 'bg-blue-100 text-blue-800';
+                if (session.priority === 'high') {
+                    priorityColor = 'bg-red-100 text-red-800';
+                } else if (session.priority === 'medium') {
+                    priorityColor = 'bg-yellow-100 text-yellow-800';
+                } else if (session.priority === 'low') {
+                    priorityColor = 'bg-green-100 text-green-800';
+                }
+
+                row.innerHTML = `
+                    <td class="py-3 px-4 text-gray-700">${session.day}</td>
+                    <td class="py-3 px-4 text-gray-700">${session.time}</td>
+                    <td class="py-3 px-4 text-gray-700">${Array.isArray(session.topics) ? session.topics.join(', ') : session.topics}</td>
+                    <td class="py-3 px-4 text-gray-700">${Array.isArray(session.activities) ? session.activities.join(', ') : session.activities}</td>
+                    <td class="py-3 px-4 text-gray-700">${session.duration} min</td>
+                    <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full ${priorityColor}">${session.priority}</span></td>
+                `;
+
+                timetableBody.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="6" class="py-4 px-4 text-center text-gray-500">No timetable entries available</td>';
+            timetableBody.appendChild(row);
+        }
+
+        // Display suggestions
+        suggestionsList.innerHTML = '';
+
+        // Handle different formats of suggestions (array, string, or undefined)
+        if (timetableData.suggestions) {
+            // If suggestions is an array
+            if (Array.isArray(timetableData.suggestions)) {
+                timetableData.suggestions.forEach(suggestion => {
+                    const li = document.createElement('li');
+                    li.textContent = suggestion;
+                    suggestionsList.appendChild(li);
+                });
+            }
+            // If suggestions is a string (could be a JSON string or plain text)
+            else if (typeof timetableData.suggestions === 'string') {
+                try {
+                    // Try to parse it as JSON
+                    const parsedSuggestions = JSON.parse(timetableData.suggestions);
+                    if (Array.isArray(parsedSuggestions)) {
+                        parsedSuggestions.forEach(suggestion => {
+                            const li = document.createElement('li');
+                            li.textContent = suggestion;
+                            suggestionsList.appendChild(li);
+                        });
+                    } else {
+                        // If it's not an array, just add it as a single suggestion
+                        const li = document.createElement('li');
+                        li.textContent = timetableData.suggestions;
+                        suggestionsList.appendChild(li);
+                    }
+                } catch (e) {
+                    // If it's not valid JSON, just use it as a single suggestion
+                    const li = document.createElement('li');
+                    li.textContent = timetableData.suggestions;
+                    suggestionsList.appendChild(li);
+                }
+            }
+            // If it's an object with text/content properties (sometimes AI returns suggestions as objects)
+            else if (typeof timetableData.suggestions === 'object') {
+                const li = document.createElement('li');
+                li.textContent = JSON.stringify(timetableData.suggestions);
+                suggestionsList.appendChild(li);
+            }
+        }
+
+        // If no suggestions or empty array, add default suggestions
+        if (suggestionsList.children.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = "Break study sessions into 25-minute focused work periods with 5-minute breaks (Pomodoro technique).";
+            suggestionsList.appendChild(li);
+
+            const li2 = document.createElement('li');
+            li2.textContent = "Review material within 24 hours of studying it to improve retention.";
+            suggestionsList.appendChild(li2);
+        }
+    }
+});
+</script>
+{% endblock %}
