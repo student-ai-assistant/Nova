@@ -16,9 +16,9 @@
     <!-- Sidebar overlay for mobile -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
 
-    <div class="flex flex-1 relative">
+    <div class="flex flex-1">
         <!-- Sidebar -->
-        <aside id="sidebar" class="fixed md:static bg-blue-800 text-white w-64 h-full z-30 transform transition-transform duration-300 ease-in-out overflow-y-auto">
+        <aside id="sidebar" class="fixed md:relative bg-blue-800 text-white w-64 h-full z-30 transform transition-transform duration-300 ease-in-out overflow-y-auto">
             <div class="p-4">
                 <h1 class="text-2xl font-bold mb-8">Student AI Assistant</h1>
                 <nav>
@@ -41,7 +41,7 @@
         </aside>
 
         <!-- Main Content -->
-        <div id="main-content" class="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out w-full">
+        <div id="main-content" class="flex-1 flex flex-col min-w-0 transition-all duration-300">
             <!-- Top Bar with collapse button -->
             <header class="bg-white shadow-sm z-10">
                 <div class="flex items-center p-4">
@@ -80,51 +80,53 @@
             const sidebar = document.getElementById('sidebar');
             const mainContent = document.getElementById('main-content');
             const sidebarOverlay = document.getElementById('sidebar-overlay');
-            
+
             // Function to handle sidebar toggle
             function toggleSidebar() {
-                const isSidebarVisible = !sidebar.classList.contains('-translate-x-full');
-                
-                if (isSidebarVisible) {
-                    // Hide sidebar
-                    sidebar.classList.add('-translate-x-full');
-                    mainContent.classList.remove('md:ml-64');
-                    mainContent.classList.add('md:ml-0');
-                    sidebarOverlay.classList.add('hidden');
-                } else {
-                    // Show sidebar
-                    sidebar.classList.remove('-translate-x-full');
-                    mainContent.classList.remove('md:ml-0');
-                    sidebarOverlay.classList.remove('hidden');
+                // Toggle sidebar visibility
+                sidebar.classList.toggle('-translate-x-full');
+
+                // Toggle overlay on mobile
+                if (window.innerWidth < 768) {
+                    if (sidebar.classList.contains('-translate-x-full')) {
+                        sidebarOverlay.classList.add('hidden');
+                    } else {
+                        sidebarOverlay.classList.remove('hidden');
+                    }
                 }
+
+                // Toggle sidebar width in layout
+                sidebar.classList.toggle('md:w-0');
+                sidebar.classList.toggle('w-0');
+
+                // Toggle main content width
+                document.body.classList.toggle('sidebar-collapsed');
             }
-            
+
             // Toggle sidebar on button click
             sidebarToggle.addEventListener('click', toggleSidebar);
-            
+
             // Close sidebar when clicking overlay (mobile)
             sidebarOverlay.addEventListener('click', toggleSidebar);
-            
+
             // Set initial state based on screen size
             function setInitialState() {
                 if (window.innerWidth < 768) {
                     sidebar.classList.add('-translate-x-full');
-                    mainContent.classList.add('md:ml-0');
                     sidebarOverlay.classList.add('hidden');
                 } else {
                     sidebar.classList.remove('-translate-x-full');
-                    mainContent.classList.remove('md:ml-0');
-                    sidebarOverlay.classList.add('hidden');
+                    sidebar.classList.remove('md:w-0');
+                    sidebar.classList.remove('w-0');
+                    document.body.classList.remove('sidebar-collapsed');
                 }
             }
-            
+
             // Call on page load
             setInitialState();
-            
+
             // Update on window resize
-            window.addEventListener('resize', function() {
-                setInitialState();
-            });
+            window.addEventListener('resize', setInitialState);
         });
     </script>
     {% block extra_js %}{% endblock %}

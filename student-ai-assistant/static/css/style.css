@@ -82,7 +82,33 @@ html, body {
     }
 }
 
-/* Ensure sidebar toggle works correctly */
+/* Sidebar toggle functionality */
+#sidebar {
+    width: 16rem; /* 256px or w-64 in Tailwind */
+    transition: transform 0.3s ease, width 0.3s ease;
+}
+
+#sidebar.w-0, #sidebar.md\:w-0 {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#sidebar.md\:w-0 {
+    visibility: hidden;
+    opacity: 0;
+}
+
+#main-content {
+    transition: margin-left 0.3s ease, width 0.3s ease;
+    width: calc(100% - 16rem);
+}
+
+.sidebar-collapsed #main-content {
+    width: 100%;
+}
+
+/* Ensure proper sidebar behavior on mobile */
 @media (max-width: 768px) {
     #sidebar {
         position: fixed;
@@ -93,6 +119,10 @@ html, body {
 
     #sidebar.md\:translate-x-0 {
         transform: translateX(0);
+    }
+
+    #main-content {
+        width: 100%;
     }
 
     .sidebar-overlay {
