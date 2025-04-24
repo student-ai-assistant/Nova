@@ -282,8 +282,13 @@ class Message:
     hidden_content: dict = field(default_factory=dict)
 
 
+
+DEBUG = False
+
 def log_msg(agent, msg: Message):
-    print(f"{'-'*80}\n{agent.id.type}:\n{msg.display_msg}\n")
+    print(f"{'-'*80}\n{agent.id.type}:")
+    if DEBUG:
+        print(f"{msg.display_msg}\n")
 
 
 
@@ -492,6 +497,7 @@ Example Structure:
 - Key Findings
 - Comparative Analysis
 - Conclusion and Future Directions
+- References
 
 Note:
 - Avoid plagiarism by paraphrasing the summaries and adding your own analytical insights.
