@@ -59,6 +59,12 @@
                                 <span>Research Assistant</span>
                             </a>
                         </li>
+                        <li class="mb-3">
+                            <a href="{{ url_for('quiz') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/quiz' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">quiz</span>
+                                <span>Quiz Generator</span>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>

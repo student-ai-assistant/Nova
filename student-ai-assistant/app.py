@@ -19,6 +19,7 @@ from journal_utils import JournalExtractor
 from motivational_utils import motivational , get_values
 from timetable_agent import TimetableAgentSystem
 from agents.research_agent import run_lit_review
+from agents.quiz_agent import QuizGenerator
 
 
 # Configure logging
@@ -42,6 +43,8 @@ search_client = None
 mongodb_client = None
 # Initialize Timetable Agent System (lazy initialization)
 timetable_agent_system = None
+# Initialize Quiz Generator (lazy initialization)
+quiz_generator = None
 
 def get_search_client():
     """Get or initialize the Azure Search client"""
@@ -65,6 +68,18 @@ def get_timetable_agent_system():
     if (timetable_agent_system is None):
         timetable_agent_system = TimetableAgentSystem(openai_endpoint=app.config['AZURE_OPENAI_ENDPOINT'], openai_api_key=app.config['AZURE_OPENAI_API_KEY'], openai_api_version=app.config['AZURE_OPENAI_API_VERSION'], openai_deployment=app.config['AZURE_OPENAI_CHAT_DEPLOYMENT'], document_intelligence_endpoint=app.config.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT'), document_intelligence_key=app.config.get('AZURE_DOCUMENT_INTELLIGENCE_KEY'))
     return timetable_agent_system
+
+def get_quiz_generator():
+    """Get or initialize the Quiz Generator"""
+    global quiz_generator
+    if (quiz_generator is None):
+        quiz_generator = QuizGenerator(
+            openai_endpoint=app.config['AZURE_OPENAI_ENDPOINT'],
+            openai_api_key=app.config['AZURE_OPENAI_API_KEY'],
+            openai_api_version=app.config['AZURE_OPENAI_API_VERSION'],
+            openai_deployment=app.config['AZURE_OPENAI_CHAT_DEPLOYMENT']
+        )
+    return quiz_generator
 
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
@@ -739,6 +754,97 @@ def generate_literature_review():
     except Exception as e:
         logger.error(f"Error generating literature review: {str(e)}")
         return jsonify({"error": f"Error generating literature review: {str(e)}"}), 500
+
+# Quiz Generation Routes
+@app.route('/quiz')
+def quiz():
+    """Render the quiz generation page with subject selection"""
+    session_id = get_session_id()
+    # Get subjects from MongoDB to populate the subject dropdown
+    mongo_client = get_mongodb_client()
+    subjects = mongo_client.get_subjects(session_id)
+    # Fetch documents for each subject to display accurate document counts
+    for subject in subjects:
+        documents = mongo_client.get_subject_documents(subject['_id'])
+        subject['documents'] = documents
+    return render_template('quiz.html', subjects=subjects)
+
+@app.route('/api/quiz/generate', methods=['POST'])
+def generate_quiz():
+    """API endpoint for generating a quiz based on subject documents and topic"""
+    try:
+        session_id = get_session_id()
+        subject_id = request.json.get('subject_id')
+        topic = request.json.get('topic')
+
+        if not subject_id or not topic:
+            return jsonify({"error": "Subject ID and topic are required"}), 400
+
+        # Get subject from MongoDB
+        mongo_client = get_mongodb_client()
+        subject = mongo_client.get_subject(subject_id)
+        if subject is None:
+            return jsonify({"error": "Subject not found"}), 404
+
+        # Get document metadata from MongoDB
+        documents = mongo_client.get_subject_documents(subject_id)
+        if not documents:
+            return jsonify({"error": "No documents found for this subject"}), 404
+
+        # Initialize quiz generator
+        quiz_gen = get_quiz_generator()
+
+        # Update the documents to include the upload folder path
+        for doc in documents:
+            # Store the upload folder temporarily for document content extraction
+            doc['_upload_folder'] = app.config['UPLOAD_FOLDER']
+
+        # Generate the quiz
+        quiz_questions = quiz_gen.generate_quiz(
+            documents=documents,
+            topic=topic,
+            num_questions=5,  # Default to 5 questions
+            options_per_question=4  # Default to 4 options per question
+        )
+
+        if not quiz_questions:
+            return jsonify({"error": "Failed to generate quiz questions. Please try a different topic or subject with more document content."}), 500
+
+        # Store the generated quiz in the session for scoring later
+        session['current_quiz'] = quiz_questions
+
+        return jsonify({"success": True, "quiz": quiz_questions})
+
+    except Exception as e:
+        logger.error(f"Error generating quiz: {str(e)}")
+        return jsonify({"error": f"Error generating quiz: {str(e)}"}), 500
+
+@app.route('/api/quiz/submit', methods=['POST'])
+def submit_quiz():
+    """API endpoint for scoring a submitted quiz"""
+    try:
+        user_answers = request.json.get('user_answers')
+        quiz_data = request.json.get('quiz_data')
+
+        if not user_answers or not quiz_data:
+            return jsonify({"error": "User answers and quiz data are required"}), 400
+
+        # Initialize quiz generator
+        quiz_gen = get_quiz_generator()
+
+        # Score the quiz
+        scoring_results = quiz_gen.score_quiz(user_answers, quiz_data)
+
+        return jsonify({
+            "success": True,
+            "score": scoring_results['score'],
+            "total": scoring_results['total'],
+            "results": scoring_results['results']
+        })
+
+    except Exception as e:
+        logger.error(f"Error scoring quiz: {str(e)}")
+        return jsonify({"error": f"Error scoring quiz: {str(e)}"}), 500
 
 # Clean up resources when app is shutting down
 @app.teardown_appcontext
