@@ -4,12 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Student AI Assistant{% endblock %}</title>
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='src/mono-logo-name.svg') }}" type="image/svg+xml">
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Apply white fill to the SVG in the sidebar */
+        .sidebar-logo {
+            filter: brightness(0) invert(1);
+            width: auto;
+            max-width: 100%;
+        }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
@@ -20,7 +30,9 @@
         <!-- Sidebar -->
         <aside id="sidebar" class="fixed md:relative bg-blue-800 text-white w-64 h-full z-30 transform transition-transform duration-300 ease-in-out overflow-y-auto">
             <div class="p-4">
-                <h1 class="text-2xl font-bold mb-8">Student AI Assistant</h1>
+                <h1 class="text-2xl font-bold mb-8 flex justify-center">
+                    <img src="{{ url_for('static', filename='src/mono-logo-name.svg') }}" alt="Student AI Assistant" class="h-24 sidebar-logo">
+                </h1>
                 <nav>
                     <ul>
                         <li class="mb-3">
@@ -60,7 +72,9 @@
                     <button id="sidebar-toggle" class="p-1 mr-4 rounded-full hover:bg-gray-200 focus:outline-none">
                         <span class="material-icons">menu</span>
                     </button>
-                    <h2 class="text-xl font-semibold">{% block header_title %}Student AI Assistant{% endblock %}</h2>
+                    <h2 class="text-xl font-semibold flex items-center">
+                        <img src="{{ url_for('static', filename='src/mono-logo-name.svg') }}" alt="Student AI Assistant" class="h-16">
+                    </h2>
                 </div>
             </header>
 
