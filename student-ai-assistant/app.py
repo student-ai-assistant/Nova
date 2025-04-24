@@ -1,6 +1,8 @@
 import os
 import uuid
 import json
+import base64
+import tempfile
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash, send_file, Response
 from werkzeug.utils import secure_filename
 import requests
@@ -10,7 +12,7 @@ import datetime
 import io
 
 # Import our utility modules
-from document_processor import extract_document_text, prepare_document_for_indexing
+from document_processor import extract_document_text, prepare_document_for_indexing, extract_text_from_pdf
 from search_utils import AzureSearchClient, get_relevant_context
 from mongodb_utils import MongoDBClient
 from journal_utils import JournalExtractor
@@ -74,6 +76,58 @@ def get_session_id():
         session['session_id'] = str(uuid.uuid4())
     return session['session_id']
 
+def process_base64_file(base64_data, file_type, file_name):
+    """
+    Process a base64-encoded file and extract its content
+    
+    Args:
+        base64_data: Base64-encoded file content
+        file_type: MIME type of the file
+        file_name: Name of the file
+        
+    Returns:
+        Extracted text from the file or a message if extraction is not possible
+    """
+    try:
+        # Remove the data URI prefix if present
+        if base64_data.startswith('data:'):
+            # Extract the base64 part after the comma
+            base64_data = base64_data.split(',', 1)[1]
+        
+        # Decode the base64 data
+        file_data = base64.b64decode(base64_data)
+        
+        # For PDFs, use our existing PDF extraction functionality
+        if file_type == 'application/pdf' or file_name.lower().endswith('.pdf'):
+            # We need to write the PDF to a temporary file to use pdfplumber
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                temp_file.write(file_data)
+                temp_path = temp_file.name
+            
+            # Extract text from the PDF
+            text_content = extract_text_from_pdf(temp_path)
+            
+            # Remove the temporary file
+            os.unlink(temp_path)
+            
+            # If we got text content, return it
+            if text_content and not text_content.startswith("Error"):
+                return f"Content extracted from PDF '{file_name}':\n\n{text_content}"
+            else:
+                return f"The PDF file '{file_name}' could not be processed properly. Please provide specific questions about it."
+        
+        # For text files
+        elif file_type.startswith('text/'):
+            return file_data.decode('utf-8', errors='replace')
+        
+        # For other file types
+        else:
+            return f"The file '{file_name}' of type '{file_type}' was uploaded but cannot be processed directly. Please provide specific questions about it."
+    
+    except Exception as e:
+        logger.error(f"Error processing file {file_name}: {str(e)}")
+        return f"Error processing file {file_name}: {str(e)}"
+
 # Routes
 @app.route('/')
 def index():
@@ -89,6 +143,24 @@ def general_chat():
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
 
+        # Check for uploaded file content (temporary, in-memory context)
+        file_data = request.json.get('file')
+        file_context = ""
+        
+        if file_data and isinstance(file_data, dict):
+            file_name = file_data.get('name', 'uploaded file')
+            file_content = file_data.get('content', '')
+            file_type = file_data.get('type', '')
+            
+            # Process file content if available
+            if file_content:
+                # Use our helper function to process the file and extract its contents
+                file_context = process_base64_file(file_content, file_type, file_name)
+                logger.info(f"Processed file {file_name} of type {file_type}")
+            
+            # Append to the user message for context
+            user_message += f"\n\nI've uploaded a file named '{file_name}' for context. Please consider it when responding."
+
         # Retrieve memory journal entries for context
         mongo_client = get_mongodb_client()
         user_journal_entries = mongo_client.get_user_journal_entries(session_id)
@@ -98,15 +170,21 @@ def general_chat():
         subject_journal_entries = mongo_client.get_all_subject_journal_entries(session_id)
         subject_memory_context = JournalExtractor.get_memory_context(subject_journal_entries, max_entries=10)
 
-        # Combine both contexts
+        # Combine all contexts
         combined_context = ""
+        
+        # Add file context first if available with strong emphasis
+        if file_context:
+            combined_context += "### UPLOADED FILE CONTEXT - IMPORTANT ###\n" + file_context + "\n\n"
+        
+        # Add memory contexts
         if user_memory_context:
             combined_context += "User's General Memory:\n" + user_memory_context + "\n\n"
         if subject_memory_context:
             combined_context += "User's Subject-Specific Memory:\n" + subject_memory_context
 
         # Call Azure OpenAI API with combined memory context
-        response = call_azure_openai(user_message, combined_context, is_subject_chat=False)
+        response = call_azure_openai(user_message, combined_context, is_subject_chat=False, has_file_context=(file_context != ""))
 
         # Extract and save important information from the user's message
         extracted_info = JournalExtractor.extract_important_information(user_message)
@@ -128,7 +206,7 @@ def general_chat():
         logger.error(f"Error in general chat: {str(e)}")
         return jsonify({"error": "An error occurred processing your request"}), 500
 
-def call_azure_openai(user_message, context=None, is_subject_chat=False):
+def call_azure_openai(user_message, context=None, is_subject_chat=False, has_file_context=False):
     """Call Azure OpenAI API with user message and optional context"""
     try:
         endpoint = app.config['AZURE_OPENAI_ENDPOINT']
@@ -143,6 +221,12 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False):
         if context:
             system_role = 'You are a helpful AI assistant for students.'
 
+            # Enhance system message for file context
+            if has_file_context:
+                system_role = 'You are a helpful AI assistant for students. You have been provided with a document for context. ' + \
+                             'Pay close attention to the UPLOADED FILE CONTEXT section and use this information to provide a detailed and relevant response. ' + \
+                             'If the document format makes it hard to interpret, acknowledge that and ask clarifying questions if needed.'
+
             # Add journal functionality information to the system message
             if is_subject_chat:
                 system_role += " Use the following information from documents and previous conversations to answer the student's question. If the answer is not in the provided context, say that you don't have that information."
@@ -153,9 +237,31 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False):
 
             system_message = {'role': 'system', 'content': system_role}
             messages.insert(0, system_message)
-            # Add context message
-            context_message = {'role': 'system', 'content': f'Context information: {context}'}
-            messages.insert(1, context_message)
+            
+            # Add context message with better formatting
+            if has_file_context:
+                # Place higher emphasis on file context by making it a separate message
+                context_parts = context.split("### UPLOADED FILE CONTEXT - IMPORTANT ###")
+                if len(context_parts) > 1:
+                    file_context = context_parts[1].split("\n\n")[0].strip()
+                    other_context = context_parts[0] + "\n\n" + "\n\n".join(context_parts[1].split("\n\n")[1:])
+                    
+                    # Add file context as a separate system message
+                    file_context_message = {'role': 'system', 'content': f"UPLOADED FILE CONTEXT:\n{file_context}"}
+                    messages.insert(1, file_context_message)
+                    
+                    # Add other context if it exists
+                    if other_context.strip():
+                        other_context_message = {'role': 'system', 'content': f'Additional context information:\n{other_context}'}
+                        messages.insert(2, other_context_message)
+                else:
+                    # Fallback if splitting didn't work as expected
+                    context_message = {'role': 'system', 'content': f'Context information:\n{context}'}
+                    messages.insert(1, context_message)
+            else:
+                # Normal context handling
+                context_message = {'role': 'system', 'content': f'Context information:\n{context}'}
+                messages.insert(1, context_message)
         else:
             # Even without context, add information about journal functionality
             system_role = 'You are a helpful AI assistant for students.'
@@ -167,7 +273,17 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False):
             system_message = {'role': 'system', 'content': system_role}
             messages.insert(0, system_message)
 
-        payload = {'messages': messages, 'max_tokens': 800, 'temperature': 0.7, 'top_p': 0.95, 'stream': False}
+        # Increase max tokens when file context is present to allow for longer responses
+        max_tokens = 1000 if has_file_context else 800
+        
+        payload = {
+            'messages': messages, 
+            'max_tokens': max_tokens, 
+            'temperature': 0.7, 
+            'top_p': 0.95, 
+            'stream': False
+        }
+        
         # Send request to Azure OpenAI
         headers = {'Content-Type': 'application/json', 'api-key': api_key}
         response = requests.post(url, headers=headers, json=payload)

@@ -3,18 +3,35 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  # Core Conda dependencies from original environment.yml
   - python=3.10
   - pip
   - flask=2.3.*
   - requests
   - python-dotenv
   - werkzeug=2.3.*
+
+  # Pip dependencies from original environment.yml and requirements.txt
+  # Explicitly listed packages only - let pip resolve dependencies
   - pip:
-    - azure-search-documents==11.5.2
-    - azure-core
-    - azure-identity
-    - python-docx  # For processing .docx files
-    - pdfplumber   # For processing PDF files
-    - markdown     # For processing .md files
-    - pymongo      # For MongoDB Atlas integration
-    - icalendar    # For generating iCalendar (.ics) files
+      # From original environment.yml
+      - azure-search-documents==11.5.2
+      - azure-core
+      - azure-identity
+      - python-docx      # For processing .docx files
+      - pdfplumber       # For processing PDF files
+      - markdown         # For processing .md files
+      - pymongo          # For MongoDB Atlas integration
+      - icalendar        # For generating iCalendar (.ics) files
+
+      # From requirements.txt (with specified versions)
+      - autogen-agentchat==0.4.8.1
+      - autogen-ext==0.4.8.1
+      - yfinance==0.2.54
+      - openai==1.65.4
+      # Note: The Git dependency is included as specified
+      - openai-whisper @ git+https://github.com/openai/whisper.git@517a43ecd132a2089d85f4ebc044728a71d49f6e
+      - pymupdf==1.25.3
+
+      # Additional package requested
+      - llama_cloud_services
