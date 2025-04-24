@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}General Chat - Student AI Assistant{% endblock %}
+{% block title %}General Chat - Nova{% endblock %}
 
-{% block header_title %}Student AI Assistant{% endblock %}
+{% block header_title %}Nova{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto flex flex-col h-full">
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileName = document.getElementById('file-name');
     const removeFile = document.getElementById('remove-file');
     const motivationalContainer = document.getElementById('motivational-container');
-    
+
     // Variable to store the uploaded file content
     let uploadedFile = null;
     let firstMessageSent = false;
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (file) {
             fileName.textContent = file.name;
             fileInfo.classList.remove('hidden');
-            
+
             // Read the file content
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     type: file.type
                 };
             };
-            
+
             if (file.type.startsWith('text/')) {
                 reader.readAsText(file);
             } else {
@@ -149,14 +149,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Prepare payload for API
         const payload = { message: message };
-        
+
         // Add file content to payload if available
         if (uploadedFile) {
             payload.file = uploadedFile;
-            
+
             // Show file was included in message
             addFileAttachmentMessage(uploadedFile.name);
-            
+
             // Clear file upload after sending
             uploadedFile = null;
             fileUpload.value = '';

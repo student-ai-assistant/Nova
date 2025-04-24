@@ -1,10 +1,10 @@
-# Copilot Instructions for Student AI Assistant Flask Application
+# Copilot Instructions for Nova Flask Application
 
-This document provides guidelines and best practices for contributing to the development of the Student AI Assistant Flask application.
+This document provides guidelines and best practices for contributing to the development of the Nova Flask application.
 
 ## Project Overview
 
-The Student AI Assistant is a Flask-based web application designed to help students with their studies. The front page features a redesigned welcoming layout with a central motivational message and a general chat interface at the bottom, with the ability to upload a file for temporary, in-memory context. A subject-specific section allows users to upload documents for persistent storage and chat with an AI agent that uses these documents as context. A refined multi-level AI agent system (three agents) generates personalized study timetables. A Literature Review feature allows users to generate research reports based on a query. **A new Quiz Generation feature enables students to create and take multiple-choice quizzes based on their subject documents and specified topics.** The application utilizes MongoDB Atlas for persistent data storage. The user interface aims for a modern aesthetic using Tailwind CSS and Material Design principles.
+Nova is a Flask-based web application designed to help students with their studies. The front page features a redesigned welcoming layout with a central motivational message and a general chat interface at the bottom, with the ability to upload a file for temporary, in-memory context. A subject-specific section allows users to upload documents for persistent storage and chat with an AI agent that uses these documents as context. A refined multi-level AI agent system (three agents) generates personalized study timetables. A Literature Review feature allows users to generate research reports based on a query. **A new Quiz Generation feature enables students to create and take multiple-choice quizzes based on their subject documents and specified topics.** The application utilizes MongoDB Atlas for persistent data storage. The user interface aims for a modern aesthetic using Tailwind CSS and Material Design principles.
 
 ## Technologies Used
 

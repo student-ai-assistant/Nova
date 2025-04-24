@@ -1,8 +1,8 @@
-# Project Requirements Document: Student AI Assistant - Quiz Generation Feature
+# Project Requirements Document: Nova - Quiz Generation Feature
 
 ### 1. Introduction (Supplement)
 
-This document details the requirements for adding a "Quiz Generation" feature to the Student AI Assistant. This feature will enable students to create and take multiple-choice quizzes based on the documents associated with their saved subjects and specific topics within those subjects, utilizing AI to generate questions and score the results.
+This document details the requirements for adding a "Quiz Generation" feature to Nova. This feature will enable students to create and take multiple-choice quizzes based on the documents associated with their saved subjects and specific topics within those subjects, utilizing AI to generate questions and score the results.
 
 ### 2. Goals and Objectives (Supplement)
 

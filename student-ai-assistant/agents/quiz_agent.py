@@ -1,5 +1,5 @@
 """
-Quiz Generation Agent for Student AI Assistant
+Quiz Generation Agent for Nova
 
 This module provides functionality to generate multiple-choice quizzes
 based on provided document content and specified topics.

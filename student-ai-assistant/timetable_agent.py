@@ -80,7 +80,7 @@ class TimetableAgentSystem:
                 # Extract text using existing document processor
                 document_text = extract_document_text(file_path)
 
-                if document_text:
+                if (document_text):
                     # Keep track of document text for topic extraction
                     all_document_text.append({
                         "filename": filename,
@@ -642,7 +642,7 @@ class TimetableAgentSystem:
         try:
             # Create a calendar
             cal = Calendar()
-            cal.add('prodid', '-//Student AI Assistant//Timetable Generator//EN')
+            cal.add('prodid', '-//Nova//Timetable Generator//EN')
             cal.add('version', '2.0')
             cal.add('calscale', 'GREGORIAN')
             cal.add('method', 'PUBLISH')
@@ -776,7 +776,7 @@ class TimetableAgentSystem:
             logger.error(f"Error generating iCalendar file: {str(e)}")
             # Return a minimal valid calendar if there's an error
             cal = Calendar()
-            cal.add('prodid', '-//Student AI Assistant//Timetable Generator Error//EN')
+            cal.add('prodid', '-//Nova//Timetable Generator Error//EN')
             cal.add('version', '2.0')
             error_event = Event()
             error_event.add('summary', "Error Generating Study Timetable")
