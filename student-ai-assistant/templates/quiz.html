@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Quiz Generation - Student AI Assistant{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-5xl">
+    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h1 class="text-2xl font-bold mb-4">Quiz Generation</h1>
+        <p class="mb-4 text-gray-700">Generate multiple-choice quizzes based on your uploaded subject documents.</p>
+
+        <div id="quiz-generation-section">
+            <form id="quiz-form" class="mb-6">
+                <div class="mb-4">
+                    <label for="subject-selector" class="block text-sm font-medium text-gray-700 mb-1">Select Subject:</label>
+                    <select id="subject-selector" name="subject_id" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" required>
+                        <option value="" disabled selected>-- Select a subject --</option>
+                        {% for subject in subjects %}
+                            <option value="{{ subject._id }}">{{ subject.name }} ({{ subject.documents|length }} document{% if subject.documents|length != 1 %}s{% endif %})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="topic-input" class="block text-sm font-medium text-gray-700 mb-1">Topic for Quiz:</label>
+                    <input type="text" id="topic-input" name="topic" class="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Enter a specific topic for your quiz" required>
+                    <p class="text-xs text-gray-500 mt-1">Be specific to get the most relevant questions.</p>
+                </div>
+
+                <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex items-center justify-center">
+                    <span class="material-icons mr-2">quiz</span>
+                    Generate Quiz
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loading-indicator" class="hidden flex flex-col items-center justify-center py-8">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-gray-700">Generating quiz questions based on your subject documents...</p>
+        </div>
+
+        <!-- Quiz questions container -->
+        <div id="quiz-container" class="hidden">
+            <h2 class="text-xl font-semibold mb-4">Multiple-Choice Quiz</h2>
+            <div id="quiz-questions" class="space-y-6 mb-6">
+                <!-- Questions will be dynamically inserted here -->
+            </div>
+
+            <div class="flex justify-center mt-6">
+                <button id="submit-quiz" class="bg-green-600 text-white py-2 px-6 rounded-md hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 flex items-center">
+                    <span class="material-icons mr-2">check_circle</span>
+                    Submit Quiz
+                </button>
+            </div>
+        </div>
+
+        <!-- Results container -->
+        <div id="results-container" class="hidden mt-6 p-4 bg-gray-50 rounded-lg">
+            <h2 class="text-xl font-semibold mb-2">Quiz Results</h2>
+            <div class="text-center mb-4">
+                <div class="text-3xl font-bold" id="score-display">0/0</div>
+                <p class="text-gray-600" id="percentage-display">0%</p>
+            </div>
+
+            <div id="review-questions" class="space-y-6 mt-6">
+                <!-- Review with correct/incorrect answers will be inserted here -->
+            </div>
+
+            <div class="flex justify-center mt-6">
+                <button id="generate-new-quiz" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex items-center">
+                    <span class="material-icons mr-2">refresh</span>
+                    Generate New Quiz
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const quizForm = document.getElementById('quiz-form');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const quizGenerationSection = document.getElementById('quiz-generation-section');
+        const quizContainer = document.getElementById('quiz-container');
+        const quizQuestions = document.getElementById('quiz-questions');
+        const submitQuizButton = document.getElementById('submit-quiz');
+        const resultsContainer = document.getElementById('results-container');
+        const scoreDisplay = document.getElementById('score-display');
+        const percentageDisplay = document.getElementById('percentage-display');
+        const reviewQuestions = document.getElementById('review-questions');
+        const generateNewQuizButton = document.getElementById('generate-new-quiz');
+
+        // Store quiz data for scoring
+        let quizData = [];
+
+        // Handle quiz form submission
+        quizForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const subjectId = document.getElementById('subject-selector').value;
+            const topic = document.getElementById('topic-input').value;
+
+            if (!subjectId || !topic) {
+                alert('Please select a subject and enter a topic.');
+                return;
+            }
+
+            // Show loading indicator
+            quizGenerationSection.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+
+            // Call the API to generate the quiz
+            fetch('/api/quiz/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    subject_id: subjectId,
+                    topic: topic
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Store quiz data for scoring
+                    quizData = data.quiz;
+
+                    // Render quiz questions
+                    renderQuiz(quizData);
+
+                    // Hide loading, show quiz
+                    loadingIndicator.classList.add('hidden');
+                    quizContainer.classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Failed to generate quiz');
+                }
+            })
+            .catch(error => {
+                console.error('Error generating quiz:', error);
+                alert('Error generating quiz: ' + error.message);
+                loadingIndicator.classList.add('hidden');
+                quizGenerationSection.classList.remove('hidden');
+            });
+        });
+
+        // Render quiz questions
+        function renderQuiz(quiz) {
+            quizQuestions.innerHTML = '';
+
+            quiz.forEach((question, questionIndex) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'bg-white p-4 rounded-lg shadow-md';
+
+                // Question text
+                const questionText = document.createElement('p');
+                questionText.className = 'font-medium mb-3';
+                questionText.textContent = `${questionIndex + 1}. ${question.question}`;
+                questionDiv.appendChild(questionText);
+
+                // Answer options
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'space-y-2 ml-4';
+
+                question.options.forEach((option, optionIndex) => {
+                    const optionLabel = document.createElement('label');
+                    optionLabel.className = 'flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100';
+
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = `question-${questionIndex}`;
+                    radio.value = optionIndex;
+                    radio.className = 'form-radio text-blue-600';
+
+                    const optionText = document.createElement('span');
+                    optionText.textContent = option;
+
+                    optionLabel.appendChild(radio);
+                    optionLabel.appendChild(optionText);
+                    optionsDiv.appendChild(optionLabel);
+                });
+
+                questionDiv.appendChild(optionsDiv);
+                quizQuestions.appendChild(questionDiv);
+            });
+        }
+
+        // Handle quiz submission
+        submitQuizButton.addEventListener('click', function() {
+            // Collect user answers
+            const userAnswers = [];
+
+            for (let i = 0; i < quizData.length; i++) {
+                const selectedOption = document.querySelector(`input[name="question-${i}"]:checked`);
+                userAnswers.push(selectedOption ? parseInt(selectedOption.value) : -1);
+            }
+
+            // Validate that all questions are answered
+            if (userAnswers.includes(-1)) {
+                alert('Please answer all questions before submitting.');
+                return;
+            }
+
+            // Submit answers for scoring
+            fetch('/api/quiz/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_answers: userAnswers,
+                    quiz_data: quizData
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Display results
+                    displayResults(data.score, data.total, data.results);
+
+                    // Hide quiz, show results
+                    quizContainer.classList.add('hidden');
+                    resultsContainer.classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Failed to score quiz');
+                }
+            })
+            .catch(error => {
+                console.error('Error scoring quiz:', error);
+                alert('Error scoring quiz: ' + error.message);
+            });
+        });
+
+        // Display quiz results
+        function displayResults(score, total, results) {
+            // Set score
+            scoreDisplay.textContent = `${score}/${total}`;
+            const percentage = Math.round((score / total) * 100);
+            percentageDisplay.textContent = `${percentage}%`;
+
+            // Clear previous results
+            reviewQuestions.innerHTML = '';
+
+            // Add each question with correct/incorrect indication
+            results.forEach((result, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'bg-white p-4 rounded-lg shadow-md';
+
+                // Question text
+                const questionText = document.createElement('p');
+                questionText.className = 'font-medium mb-3';
+                questionText.textContent = `${index + 1}. ${result.question}`;
+                questionDiv.appendChild(questionText);
+
+                // Status indicator (correct/incorrect)
+                const statusBadge = document.createElement('span');
+                statusBadge.className = result.isCorrect ?
+                    'ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800' :
+                    'ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800';
+                statusBadge.textContent = result.isCorrect ? 'Correct' : 'Incorrect';
+                questionText.appendChild(statusBadge);
+
+                // Answer options
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'space-y-2 ml-4';
+
+                result.options.forEach((option, optionIndex) => {
+                    const optionDiv = document.createElement('div');
+
+                    // Style based on correct answer and user's selection
+                    if (optionIndex === result.correctAnswer) {
+                        // Correct answer
+                        optionDiv.className = 'p-2 rounded-md bg-green-100 border-l-4 border-green-500';
+                    } else if (optionIndex === result.userAnswer && !result.isCorrect) {
+                        // Incorrect selected answer
+                        optionDiv.className = 'p-2 rounded-md bg-red-100 border-l-4 border-red-500';
+                    } else {
+                        // Other options
+                        optionDiv.className = 'p-2 rounded-md';
+                    }
+
+                    optionDiv.textContent = option;
+
+                    // Add icon for correct/incorrect
+                    if (optionIndex === result.correctAnswer) {
+                        const icon = document.createElement('span');
+                        icon.className = 'material-icons text-green-700 text-sm ml-1';
+                        icon.textContent = 'check_circle';
+                        optionDiv.appendChild(icon);
+                    } else if (optionIndex === result.userAnswer && !result.isCorrect) {
+                        const icon = document.createElement('span');
+                        icon.className = 'material-icons text-red-700 text-sm ml-1';
+                        icon.textContent = 'cancel';
+                        optionDiv.appendChild(icon);
+                    }
+
+                    optionsDiv.appendChild(optionDiv);
+                });
+
+                questionDiv.appendChild(optionsDiv);
+                reviewQuestions.appendChild(questionDiv);
+            });
+        }
+
+        // Handle "Generate New Quiz" button
+        generateNewQuizButton.addEventListener('click', function() {
+            // Clear quiz data
+            quizData = [];
+
+            // Hide results, show form
+            resultsContainer.classList.add('hidden');
+            quizGenerationSection.classList.remove('hidden');
+        });
+    });
+</script>
+{% endblock %}
