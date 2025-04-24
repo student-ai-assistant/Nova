@@ -202,6 +202,60 @@ class MongoDBClient:
             logger.error(f"Failed to add document metadata: {str(e)}")
             return None
 
+    def get_document(self, document_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific document by ID
+
+        Args:
+            document_id: Document ID
+
+        Returns:
+            Document metadata dictionary or None if not found
+        """
+        try:
+            collection = self.get_collection('documents')
+            if collection is None:
+                return None
+
+            document = collection.find_one({'_id': ObjectId(document_id)})
+
+            if document:
+                document['_id'] = str(document['_id'])
+
+            return document
+
+        except PyMongoError as e:
+            logger.error(f"Failed to get document {document_id}: {str(e)}")
+            return None
+
+    def delete_document_metadata(self, document_id: str) -> bool:
+        """
+        Delete document metadata by ID
+
+        Args:
+            document_id: Document ID to delete
+
+        Returns:
+            True if deletion was successful, False otherwise
+        """
+        try:
+            collection = self.get_collection('documents')
+            if collection is None:
+                return False
+
+            result = collection.delete_one({'_id': ObjectId(document_id)})
+
+            if result.deleted_count == 1:
+                logger.info(f"Deleted document metadata: {document_id}")
+                return True
+            else:
+                logger.warning(f"No document found with ID: {document_id}")
+                return False
+
+        except PyMongoError as e:
+            logger.error(f"Failed to delete document metadata {document_id}: {str(e)}")
+            return False
+
     def get_subject_documents(self, subject_id: str) -> List[Dict[str, Any]]:
         """
         Get documents for a specific subject

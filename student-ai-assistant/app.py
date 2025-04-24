@@ -846,6 +846,70 @@ def submit_quiz():
         logger.error(f"Error scoring quiz: {str(e)}")
         return jsonify({"error": f"Error scoring quiz: {str(e)}"}), 500
 
+@app.route('/api/subjects/<subject_id>/documents/<document_id>/delete', methods=['DELETE'])
+def delete_document(subject_id, document_id):
+    """API endpoint to delete a document and its metadata from MongoDB and storage"""
+    try:
+        session_id = get_session_id()
+
+        # Get MongoDB client
+        mongo_client = get_mongodb_client()
+
+        # Check if subject exists
+        subject = mongo_client.get_subject(subject_id)
+        if subject is None:
+            return jsonify({'error': 'Subject not found'}), 404
+
+        # Get document metadata from MongoDB
+        document = mongo_client.get_document(document_id)
+        if document is None:
+            return jsonify({'error': 'Document not found'}), 404
+
+        # Verify that the document belongs to the specified subject
+        if document.get('subject_id') != subject_id:
+            return jsonify({'error': 'Document does not belong to the specified subject'}), 403
+
+        # Get the file path from metadata
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], document.get('storage_path', ''))
+
+        # Delete the actual document file from storage
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Deleted document file: {file_path}")
+            except Exception as e:
+                logger.error(f"Error deleting document file {file_path}: {str(e)}")
+                return jsonify({'error': f"Error deleting document file: {str(e)}"}), 500
+        else:
+            logger.warning(f"Document file not found: {file_path}")
+
+        # Delete document metadata from MongoDB
+        deleted = mongo_client.delete_document_metadata(document_id)
+        if not deleted:
+            return jsonify({'error': 'Failed to delete document metadata'}), 500
+
+        # If we have Azure Search configured, try to remove the document from the search index
+        if app.config.get('AZURE_SEARCH_ENDPOINT') and app.config.get('AZURE_SEARCH_API_KEY'):
+            try:
+                search_client = get_search_client()
+                if search_client.is_available:
+                    # Delete by document ID filter - Note: This assumes a consistent ID format in the search index
+                    filter_expression = f"metadata_storage_name eq '{document.get('storage_path')}'"
+                    search_client.delete_documents_by_filter(filter_expression)
+                    logger.info(f"Removed document from search index: {document.get('filename')}")
+            except Exception as e:
+                # Log the error but don't fail the entire operation if search index deletion fails
+                logger.error(f"Error removing document from search index: {str(e)}")
+
+        return jsonify({
+            'success': True,
+            'message': f"Document '{document.get('filename')}' deleted successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting document: {str(e)}")
+        return jsonify({'error': f"Error deleting document: {str(e)}"}), 500
+
 # Clean up resources when app is shutting down
 @app.teardown_appcontext
 def close_connections(exception=None):

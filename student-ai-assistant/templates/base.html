@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,6 +18,68 @@
             filter: brightness(0) invert(1);
             width: auto;
             max-width: 100%;
+        }
+
+        /* Header logo styling */
+        .header-logo {
+            width: auto;
+            max-width: 100%;
+            height: 4rem; /* h-16 equivalent */
+            transition: filter 0.3s ease;
+        }
+
+        /* Make header logo white in dark mode */
+        .dark .header-logo {
+            filter: brightness(0) invert(1);
+        }
+
+        /* Dark mode styles */
+        .dark body {
+            background-color: #1a1a1a;
+            color: #f3f4f6;
+        }
+
+        .dark .bg-white {
+            background-color: #242424;
+            color: #f3f4f6;
+        }
+
+        .dark .bg-gray-100 {
+            background-color: #1a1a1a;
+            color: #f3f4f6;
+        }
+
+        .dark .text-gray-500 {
+            color: #9ca3af;
+        }
+
+        .dark .text-gray-700 {
+            color: #e5e7eb;
+        }
+
+        .dark .border-gray-200 {
+            border-color: #374151;
+        }
+
+        .dark .bg-blue-100 {
+            background-color: #1e3a8a;
+            color: #bfdbfe;
+        }
+
+        .dark .bg-green-100 {
+            background-color: #064e3b;
+            color: #a7f3d0;
+        }
+
+        .dark .shadow-sm,
+        .dark .shadow,
+        .dark .shadow-lg {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3),
+                        0 1px 2px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        .dark .border {
+            border-color: #4b5563;
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -65,6 +127,12 @@
                                 <span>Quiz Generator</span>
                             </a>
                         </li>
+                        <li class="mt-6">
+                            <button id="dark-mode-toggle" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors w-full">
+                                <span class="material-icons mr-3" id="theme-icon">dark_mode</span>
+                                <span id="theme-text">Dark Mode</span>
+                            </button>
+                        </li>
                     </ul>
                 </nav>
             </div>
@@ -79,7 +147,7 @@
                         <span class="material-icons">menu</span>
                     </button>
                     <h2 class="text-xl font-semibold flex items-center">
-                        <img src="{{ url_for('static', filename='src/mono-logo-name.svg') }}" alt="Nova" class="h-16">
+                        <img src="{{ url_for('static', filename='src/mono-logo-name.svg') }}" alt="Nova" class="h-16 header-logo">
                     </h2>
                 </div>
             </header>
@@ -159,6 +227,51 @@
 
             // Update on window resize
             window.addEventListener('resize', setInitialState);
+
+            // Dark mode functionality
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            const htmlElement = document.documentElement;
+
+            // Check for saved theme preference or respect OS preference
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            // Set the initial theme
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                htmlElement.classList.add('dark');
+                themeIcon.textContent = 'light_mode';
+                themeText.textContent = 'Light Mode';
+            }
+
+            // Update theme icons and text based on current mode
+            function updateThemeUI() {
+                if (htmlElement.classList.contains('dark')) {
+                    themeIcon.textContent = 'light_mode';
+                    themeText.textContent = 'Light Mode';
+                } else {
+                    themeIcon.textContent = 'dark_mode';
+                    themeText.textContent = 'Dark Mode';
+                }
+            }
+
+            // Toggle dark/light mode
+            darkModeToggle.addEventListener('click', function() {
+                htmlElement.classList.toggle('dark');
+
+                // Update localStorage
+                if (htmlElement.classList.contains('dark')) {
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    localStorage.setItem('theme', 'light');
+                }
+
+                updateThemeUI();
+            });
+
+            // Initialize theme UI
+            updateThemeUI();
         });
     </script>
     {% block extra_js %}{% endblock %}
