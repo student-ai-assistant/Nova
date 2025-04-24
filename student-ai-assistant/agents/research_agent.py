@@ -1,4 +1,3 @@
-
 import os
 os.environ['LLAMA_CLOUD_API_KEY'] = 'llx-57leIBOeFARXE4hPwJoADhfgXK8uaWiA3FmVbXQ82QXLT478'
 os.environ['TOGETHER_API_KEY'] = '714ebaca2e6f19ceac63a29def9a8c0186eae4b61e7498185cf900d45c1f1902'
@@ -12,9 +11,12 @@ from getpass import getpass
 import urllib3
 import json
 import os
+import warnings
 
 urllib3.disable_warnings()
 
+# Suppress specific pdfminer warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='pdfminer.pdfpage')
 
 def get_api_key(key_name):
     if key_name in os.environ:
@@ -100,7 +102,7 @@ def query_semantic_scholar(query: str, limit: int, ntries:int = None):
         ntries = int(SEMANTIC_API_MAX_RETRIES)
     if ntries <= 0:
         print("Semantic Scholar API rate limit exceeded, exiting...")
-        return [] 
+        return []
 
     url = (
         f"https://api.semanticscholar.org/graph/v1/paper/search?"
@@ -121,7 +123,7 @@ def query_semantic_scholar(query: str, limit: int, ntries:int = None):
 
 
 def remove_reference_section(pdf_path: str, out_path: str):
-    doc = fitz.open(pdf_path)    
+    doc = fitz.open(pdf_path)
 
     def get_reference_page_number(doc):
         toc = doc.get_toc()
@@ -161,10 +163,10 @@ def get_papers(query: str, num_papers: int):
         papers: list of dictionaries containing paper metadata
     '''
     papers = []
-    
+
     for paper in query_semantic_scholar(query, NUM_SEARCH_RESULTS):
         try:
-            fname = paper['title'].replace(' ', '_') 
+            fname = paper['title'].replace(' ', '_')
             paper_folder = os.path.join(PAPER_SAVE_DIR, fname)
             os.makedirs(paper_folder, exist_ok=True)
             out_path = os.path.join(paper_folder, f"paper.pdf")
@@ -220,7 +222,7 @@ async def parse_pdf(pdf_path):
 async def parse_all_papers(papers):
     tasks = [parse_pdf(paper["pdf_path"]) for paper in papers]  # Create tasks
     results = await asyncio.gather(*tasks)  # Run all tasks in parallel
-    
+
     # Store results back in papers
     for paper, parsed_data in zip(papers, results):
         content = '\n'.join(doc.text for doc in parsed_data)
@@ -237,7 +239,7 @@ import re
 def clean_text(text):
     # replace links with "<LINK>" token
     text = re.sub(r'http\S+', '<LINK>', text)
-    
+
     # remove the references section
     for ref_title in REFERENCE_TITLES:
         ref_start = text.lower().find(f'# {ref_title.lower()}')
@@ -317,7 +319,7 @@ search_papers_tool = FunctionTool(
     description="Search for papers on a given topic using Semantic Scholar API"
 )
 
-    
+
 
 @type_subscription(topic_type=search_topic_type)
 class SearchAgent(RoutedAgent):
@@ -338,9 +340,9 @@ class SearchAgent(RoutedAgent):
         if isinstance(llm_result.content, str):
             log_msg(self, Message(display_msg=llm_result.content))
             return None
-        
+
         papers, arguments = await self._handle_tool_call(llm_result)
-        
+
         refined_title = arguments['query']
         num_papers = len(papers)
         message_to_report_generator = Message(
@@ -349,7 +351,7 @@ class SearchAgent(RoutedAgent):
         )
         log_msg(self, message_to_report_generator)
         await self.publish_message(message_to_report_generator, topic_id=TopicId(report_generator_type, source=self.id.key))
-        
+
         msg_tasks = []
         for paper in papers:
             message_to_summarizer = Message(
@@ -371,15 +373,15 @@ class SearchAgent(RoutedAgent):
 
         if len(llm_result.content) != 1:
             raise ValueError("Expected a single tool call")
-        
+
         tool_call = llm_result.content[0]
         if tool_call.name != self._search_papers_tool.name:
             raise ValueError(f'Unexpected tool call: {tool_call.name}')
-        
+
         arguments = json.loads(tool_call.arguments)
         result = await self._search_papers_tool.run_json(arguments, CancellationToken())
         return result, arguments
-        
+
 
 
 
@@ -398,7 +400,7 @@ async def parse_pdf_and_save(pdf_path: str):
     if USE_CACHE_FOR_PDF_PARSING and os.path.exists(out_path):
         with open(out_path, 'r') as f:
             return f.read()
-        
+
 
     parsed_data = await parser.aload_data(pdf_path)
     content = '\n'.join(doc.text for doc in parsed_data)
@@ -426,7 +428,7 @@ class SummarizerAgent(RoutedAgent):
         except KeyError as e:
             print(f"Invalid message received in {self.id.type}: {message.display_msg}")
             raise e
-        
+
         summary_path = os.path.join(os.path.dirname(pdf_path), "summary.md")
 
         if USE_CACHE_FOR_SUMMARIZATION and os.path.exists(summary_path):
@@ -442,7 +444,7 @@ class SummarizerAgent(RoutedAgent):
             summary = llm_result.content
             assert isinstance(summary, str)
 
-        
+
             with open(summary_path, 'w') as f:
                 f.write(summary)
 
@@ -530,8 +532,8 @@ class ReportGeneratorAgent(RoutedAgent):
 
         if self.num_papers is None:
             raise ValueError(f"Number of papers should be set before receiving summaries. Got: {message.display_msg}")
-        
-        
+
+
         title, summary_path = message.hidden_content['title'], message.hidden_content['summary_path']
         with open(summary_path, 'r') as f:
             summary = f.read()
@@ -541,7 +543,7 @@ class ReportGeneratorAgent(RoutedAgent):
             content = f'Below are the summaries of {self.num_papers} papers:\n\n'
             for title, summary in self.summaries:
                 content += f'Paper: {title}\n{summary}\n\n'
-                
+
             llm_result = await self._model_client.create(
                 messages=[self._system_message, UserMessage(content=content, source=self.id.key)],
                 cancellation_token=ctx.cancellation_token,
@@ -561,7 +563,7 @@ class ReportGeneratorAgent(RoutedAgent):
             log_msg(self, message_to_user)
             await self.publish_message(Termination(reason="Report generated"), DefaultTopicId())
             # await self.publish_message(message_to_user, topic_id=TopicId(user_agent_type, source=self.id.key))
-        
+
 
         return None
 
@@ -571,12 +573,12 @@ class UserAgent(RoutedAgent):
     def __init__(self, disp_prompt: str, to_topic_type: str) -> None:
         super().__init__("User")
         self._disp_prompt = disp_prompt
-        self._to_topic_type = to_topic_type   
+        self._to_topic_type = to_topic_type
 
     @message_handler
     async def on_message(self, message: Message, ctx: MessageContext) -> None:
         user_msg = input(self._disp_prompt)
-        hidden_content = message.hidden_content 
+        hidden_content = message.hidden_content
         msg = Message(display_msg=user_msg, hidden_content=hidden_content)
         log_msg(self, msg)
         await self.publish_message(msg, topic_id=TopicId(self._to_topic_type, source=self.id.key))
@@ -689,7 +691,7 @@ async def literature_review(user_query):
     await SummarizerAgent.register(
         runtime, type=paper_summarizer, factory=lambda: SummarizerAgent(model_client=model_client_together)
     )
-        
+
     await ReportGeneratorAgent.register(
         runtime, type=report_generator_type, factory=lambda: ReportGeneratorAgent(model_client=model_client_together)
     )

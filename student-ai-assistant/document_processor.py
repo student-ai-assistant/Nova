@@ -10,10 +10,14 @@ from docx import Document
 import markdown
 import re
 from pathlib import Path
+import warnings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Suppress specific pdfminer warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='pdfminer.pdfpage')
 
 def extract_text_from_pdf(file_path: str) -> str:
     """

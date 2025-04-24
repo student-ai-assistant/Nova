@@ -564,7 +564,7 @@ class TimetableAgentSystem:
             USER COMMITMENTS:
             {commitments_text}
 
-            Please return a well-structured JSON timetable that covers all important topics within the specified timeframe
+            Please return a well-structured JSON timetable that covers all important topics **based on the topics to study** within the specified timeframe
             while respecting the user's commitments. Clearly mark any conflicts between study sessions and commitments.
             """
 
