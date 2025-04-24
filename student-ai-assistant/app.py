@@ -364,6 +364,11 @@ def retrieve_document_context(subject_id, query):
         return f"Error retrieving document context: {str(e)}"
 
 # Timetable Generator Routes
+@app.route('/jobs')
+def jobs():
+    return render_template('jobs.html')
+    
+# Timetable Generator Routes
 @app.route('/timetable')
 def timetable():
     """Render the timetable generation page"""

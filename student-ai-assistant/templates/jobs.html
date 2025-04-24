@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Job Matches for You - Student AI Assistant{% endblock %}
+
+{% block header_title %}Career Pathways Tailored to Your Learning{% endblock %}
+
+{% block content %}
+<div class="container mx-auto py-6">
+  <!-- AI Summary Banner -->
+  <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-6 rounded-lg shadow mb-6 text-center">
+    <h2 class="text-2xl font-semibold text-blue-800">✨ Based on your study subjects and interests, here are your personalized career suggestions:</h2>
+    <p class="text-gray-600 mt-2">We're using your document topics and academic focus to connect you with great Werkstudent opportunities, preparation tips, and skill boosters.</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Recommended Jobs -->
+    <div class="bg-white p-5 rounded-lg shadow-lg">
+      <h3 class="text-lg font-bold text-blue-700 mb-1">Werkstudent – Python Developer</h3>
+      <p class="text-sm text-gray-500 mb-2">Tech Solutions GmbH • Berlin • Remote</p>
+      <p class="text-sm text-gray-600 mb-4">Build smart backend tools and integrate LLM APIs. Great fit if you've worked with Flask, APIs, or Python scripting.</p>
+      <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-all">Apply Now</button>
+    </div>
+
+    <div class="bg-white p-5 rounded-lg shadow-lg">
+      <h3 class="text-lg font-bold text-blue-700 mb-1">Werkstudent – AI Research Assistant</h3>
+      <p class="text-sm text-gray-500 mb-2">EduAI Labs • Munich • Remote</p>
+      <p class="text-sm text-gray-600 mb-4">Support experiments and fine-tune models. Ideal for NLP and LLM enthusiasts who uploaded ML-related documents.</p>
+      <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-all">Apply Now</button>
+    </div>
+
+    <div class="bg-white p-5 rounded-lg shadow-lg">
+      <h3 class="text-lg font-bold text-blue-700 mb-1">Werkstudent – Data Analyst</h3>
+      <p class="text-sm text-gray-500 mb-2">DataForce DE • Hamburg • Hybrid</p>
+      <p class="text-sm text-gray-600 mb-4">Use your stats notes! Help visualize data and trends in student learning metrics.</p>
+      <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-all">Apply Now</button>
+    </div>
+  </div>
+
+  <!-- Interview Preparation and Courses -->
+  <div class="mt-10">
+    <h3 class="text-xl font-semibold mb-4">🎓 Suggested Courses & Interview Prep</h3>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="p-4 bg-white rounded-lg shadow">
+        <h4 class="font-medium text-blue-700">Crash Course: Python for Interviews</h4>
+        <p class="text-sm text-gray-600">Sharpen your syntax, logic, and API skills in this 2-week guided review.</p>
+      </div>
+      <div class="p-4 bg-white rounded-lg shadow">
+        <h4 class="font-medium text-blue-700">LLM Fundamentals & Prompt Engineering</h4>
+        <p class="text-sm text-gray-600">Learn how to query language models effectively. Relevant for AI-focused roles.</p>
+      </div>
+      <div class="p-4 bg-white rounded-lg shadow">
+        <h4 class="font-medium text-blue-700">Certificate: Azure AI Fundamentals (AI-900)</h4>
+        <p class="text-sm text-gray-600">Recommended for anyone exploring careers in AI. Adds credibility to your resume.</p>
+      </div>
+      <div class="p-4 bg-white rounded-lg shadow">
+        <h4 class="font-medium text-blue-700">Interview Questions Bank – Tech Werkstudent</h4>
+        <p class="text-sm text-gray-600">Prepare with real questions from recent Werkstudent interviews in Germany.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

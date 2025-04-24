@@ -28,11 +28,17 @@
                                 <span class="material-icons mr-3">chat</span>
                                 <span>General Chat</span>
                             </a>
-                        </li>
+                        </li> 
                         <li class="mb-3">
                             <a href="{{ url_for('subjects_list') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/subjects' in request.path %}bg-blue-700{% endif %}">
                                 <span class="material-icons mr-3">book</span>
                                 <span>Subjects</span>
+                            </a>
+                        </li>
+                        <li class="mb-3">
+                            <a href="{{ url_for('jobs') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/subjects' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">book</span>
+                                <span>Jobs</span>
                             </a>
                         </li>
                         <li class="mb-3">
