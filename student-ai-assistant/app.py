@@ -79,12 +79,12 @@ def get_session_id():
 def process_base64_file(base64_data, file_type, file_name):
     """
     Process a base64-encoded file and extract its content
-    
+
     Args:
         base64_data: Base64-encoded file content
         file_type: MIME type of the file
         file_name: Name of the file
-        
+
     Returns:
         Extracted text from the file or a message if extraction is not possible
     """
@@ -93,37 +93,37 @@ def process_base64_file(base64_data, file_type, file_name):
         if base64_data.startswith('data:'):
             # Extract the base64 part after the comma
             base64_data = base64_data.split(',', 1)[1]
-        
+
         # Decode the base64 data
         file_data = base64.b64decode(base64_data)
-        
+
         # For PDFs, use our existing PDF extraction functionality
         if file_type == 'application/pdf' or file_name.lower().endswith('.pdf'):
             # We need to write the PDF to a temporary file to use pdfplumber
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
                 temp_file.write(file_data)
                 temp_path = temp_file.name
-            
+
             # Extract text from the PDF
             text_content = extract_text_from_pdf(temp_path)
-            
+
             # Remove the temporary file
             os.unlink(temp_path)
-            
+
             # If we got text content, return it
             if text_content and not text_content.startswith("Error"):
                 return f"Content extracted from PDF '{file_name}':\n\n{text_content}"
             else:
                 return f"The PDF file '{file_name}' could not be processed properly. Please provide specific questions about it."
-        
+
         # For text files
         elif file_type.startswith('text/'):
             return file_data.decode('utf-8', errors='replace')
-        
+
         # For other file types
         else:
             return f"The file '{file_name}' of type '{file_type}' was uploaded but cannot be processed directly. Please provide specific questions about it."
-    
+
     except Exception as e:
         logger.error(f"Error processing file {file_name}: {str(e)}")
         return f"Error processing file {file_name}: {str(e)}"
@@ -146,18 +146,18 @@ def general_chat():
         # Check for uploaded file content (temporary, in-memory context)
         file_data = request.json.get('file')
         file_context = ""
-        
+
         if file_data and isinstance(file_data, dict):
             file_name = file_data.get('name', 'uploaded file')
             file_content = file_data.get('content', '')
             file_type = file_data.get('type', '')
-            
+
             # Process file content if available
             if file_content:
                 # Use our helper function to process the file and extract its contents
                 file_context = process_base64_file(file_content, file_type, file_name)
                 logger.info(f"Processed file {file_name} of type {file_type}")
-            
+
             # Append to the user message for context
             user_message += f"\n\nI've uploaded a file named '{file_name}' for context. Please consider it when responding."
 
@@ -172,11 +172,11 @@ def general_chat():
 
         # Combine all contexts
         combined_context = ""
-        
+
         # Add file context first if available with strong emphasis
         if file_context:
             combined_context += "### UPLOADED FILE CONTEXT - IMPORTANT ###\n" + file_context + "\n\n"
-        
+
         # Add memory contexts
         if user_memory_context:
             combined_context += "User's General Memory:\n" + user_memory_context + "\n\n"
@@ -229,15 +229,21 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False, has_fil
 
             # Add journal functionality information to the system message
             if is_subject_chat:
-                system_role += " Use the following information from documents and previous conversations to answer the student's question. If the answer is not in the provided context, say that you don't have that information."
-                system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific about this subject, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your subject journal for future reference."
+                system_role = 'You are a knowledgeable AI assistant for students. ' + \
+                              'You have been provided with information from documents related to this subject. ' + \
+                              'IMPORTANT: Thoroughly examine the DOCUMENT INFORMATION section below and use that content to provide detailed answers. ' + \
+                              'Try your best to answer based on what is provided in the document information. ' + \
+                              'Use your own knowledge to enhance your answers, but prioritize the provided document information. ' + \
+                              'Only say you don\'t have information if the answer is completely absent from both the document context and your knowledge.'
+
+                system_role += " I have the ability to remember important information you share with me. When you need me to remember something specific about this subject, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your subject journal for future reference."
             else:
                 system_role += ' Use the following information from previous conversations to provide personalized assistance.'
                 system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your journal for future reference."
 
             system_message = {'role': 'system', 'content': system_role}
             messages.insert(0, system_message)
-            
+
             # Add context message with better formatting
             if has_file_context:
                 # Place higher emphasis on file context by making it a separate message
@@ -245,15 +251,43 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False, has_fil
                 if len(context_parts) > 1:
                     file_context = context_parts[1].split("\n\n")[0].strip()
                     other_context = context_parts[0] + "\n\n" + "\n\n".join(context_parts[1].split("\n\n")[1:])
-                    
+
                     # Add file context as a separate system message
                     file_context_message = {'role': 'system', 'content': f"UPLOADED FILE CONTEXT:\n{file_context}"}
                     messages.insert(1, file_context_message)
-                    
+
                     # Add other context if it exists
                     if other_context.strip():
                         other_context_message = {'role': 'system', 'content': f'Additional context information:\n{other_context}'}
                         messages.insert(2, other_context_message)
+                else:
+                    # Fallback if splitting didn't work as expected
+                    context_message = {'role': 'system', 'content': f'Context information:\n{context}'}
+                    messages.insert(1, context_message)
+            elif is_subject_chat and "### DOCUMENT INFORMATION ###" in context:
+                # For subject chat, split document and conversation information for better context handling
+                context_parts = context.split("### DOCUMENT INFORMATION ###")
+                if len(context_parts) > 1:
+                    doc_start = context_parts[1].find("\n") + 1  # Skip the header line
+                    doc_context = context_parts[1][doc_start:].strip()
+
+                    if "### PREVIOUS CONVERSATION INFORMATION ###" in doc_context:
+                        doc_parts = doc_context.split("### PREVIOUS CONVERSATION INFORMATION ###")
+                        doc_context = doc_parts[0].strip()
+                        conv_context = doc_parts[1].strip()
+
+                        # Add document context as a separate assistant message for better visibility
+                        doc_context_message = {'role': 'assistant', 'content': f"DOCUMENT INFORMATION:\n{doc_context}"}
+                        messages.insert(1, doc_context_message)
+
+                        # Add conversation context if it exists
+                        if conv_context:
+                            conv_context_message = {'role': 'system', 'content': f'PREVIOUS CONVERSATION INFORMATION:\n{conv_context}'}
+                            messages.insert(2, conv_context_message)
+                    else:
+                        # Only document context exists
+                        doc_context_message = {'role': 'assistant', 'content': f"DOCUMENT INFORMATION:\n{doc_context}"}
+                        messages.insert(1, doc_context_message)
                 else:
                     # Fallback if splitting didn't work as expected
                     context_message = {'role': 'system', 'content': f'Context information:\n{context}'}
@@ -275,15 +309,19 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False, has_fil
 
         # Increase max tokens when file context is present to allow for longer responses
         max_tokens = 1000 if has_file_context else 800
-        
+
+        # For subject chat with document information, increase token limit for more comprehensive answers
+        if is_subject_chat and context and "### DOCUMENT INFORMATION ###" in context:
+            max_tokens = 1200
+
         payload = {
-            'messages': messages, 
-            'max_tokens': max_tokens, 
-            'temperature': 0.7, 
-            'top_p': 0.95, 
+            'messages': messages,
+            'max_tokens': max_tokens,
+            'temperature': 0.7,
+            'top_p': 0.95,
             'stream': False
         }
-        
+
         # Send request to Azure OpenAI
         headers = {'Content-Type': 'application/json', 'api-key': api_key}
         response = requests.post(url, headers=headers, json=payload)
@@ -343,52 +381,76 @@ def subject_detail(subject_id):
 
 @app.route('/subjects/<subject_id>/upload', methods=['POST'])
 def upload_document(subject_id):
-    """Upload a document for a specific subject"""
+    """Upload one or more documents for a specific subject"""
     session_id = get_session_id()
     # Get subject from MongoDB
     mongo_client = get_mongodb_client()
     subject = mongo_client.get_subject(subject_id)
     if (subject is None):
         return jsonify({'error': 'Subject not found'}), 404
-    # Check if a file was uploaded
-    if ('document' not in request.files):
+
+    # Check if files were uploaded - support both single and multiple uploads
+    if ('document' not in request.files and 'documents' not in request.files):
         return jsonify({'error': 'No document part in the request'}), 400
-    file = request.files['document']
-    # Check if the file was actually selected
-    if (file.filename == ''):
-        return jsonify({'error': 'No file selected'}), 400
-    # Check if the file extension is allowed
-    if (not allowed_file(file.filename)):
-        return jsonify({'error': f"File type not allowed. Allowed types: {', '.join(app.config['ALLOWED_EXTENSIONS'])}"}), 400
-    # Secure the filename and generate a unique filename
-    filename = secure_filename(file.filename)
-    unique_filename = f'{subject_id}_{str(uuid.uuid4())}_{filename}'
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-    try:
-        # Save the file
-        file.save(file_path)
-        # Add document metadata to MongoDB
-        document_data = {'filename': filename, 'storage_path': unique_filename, 'subject_id': subject_id, 'session_id': session_id, 'size': os.path.getsize(file_path)}
-        document_id = mongo_client.add_document_metadata(document_data)
-        if document_id:
-            document_data['_id'] = document_id
-        # Process and index the document in Azure AI Search if available
-        if app.config.get('AZURE_SEARCH_ENDPOINT') and app.config.get('AZURE_SEARCH_API_KEY'):
-            try:
-                # Prepare the document for indexing
-                documents = prepare_document_for_indexing(doc_info=document_data, subject_name=subject['name'], file_path=file_path)
-                # Upload to Azure AI Search
-                if documents:
-                    search_client = get_search_client()
-                    uploaded = search_client.upload_documents(documents)
-                    logger.info(f"Indexed {uploaded} document chunks for '{filename}'")
-            except Exception as e:
-                logger.error(f"Error indexing document: {str(e)}")
-                # Continue without failing if indexing fails
-        return jsonify({'success': True, 'message': 'Document uploaded successfully', 'document': document_data})
-    except Exception as e:
-        logger.error(f"Error uploading document: {str(e)}")
-        return jsonify({'error': f"Error uploading document: {str(e)}"}), 500
+
+    # Handle multiple file uploads
+    if 'documents' in request.files:
+        files = request.files.getlist('documents')
+        if not files or len(files) == 0 or all(f.filename == '' for f in files):
+            return jsonify({'error': 'No files selected'}), 400
+    # Handle single file upload (backward compatibility)
+    else:
+        files = [request.files['document']]
+        if files[0].filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+    # Process all uploaded files
+    uploaded_documents = []
+    for file in files:
+        # Check if the file extension is allowed
+        if (not allowed_file(file.filename)):
+            continue  # Skip this file but continue processing others
+
+        # Secure the filename and generate a unique filename
+        filename = secure_filename(file.filename)
+        unique_filename = f'{subject_id}_{str(uuid.uuid4())}_{filename}'
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        try:
+            # Save the file
+            file.save(file_path)
+            # Add document metadata to MongoDB
+            document_data = {'filename': filename, 'storage_path': unique_filename, 'subject_id': subject_id, 'session_id': session_id, 'size': os.path.getsize(file_path)}
+            document_id = mongo_client.add_document_metadata(document_data)
+            if document_id:
+                document_data['_id'] = document_id
+
+            uploaded_documents.append(document_data)
+
+            # Process and index the document in Azure AI Search if available
+            if app.config.get('AZURE_SEARCH_ENDPOINT') and app.config.get('AZURE_SEARCH_API_KEY'):
+                try:
+                    # Prepare the document for indexing
+                    documents = prepare_document_for_indexing(doc_info=document_data, subject_name=subject['name'], file_path=file_path)
+                    # Upload to Azure AI Search
+                    if documents:
+                        search_client = get_search_client()
+                        uploaded = search_client.upload_documents(documents)
+                        logger.info(f"Indexed {uploaded} document chunks for '{filename}'")
+                except Exception as e:
+                    logger.error(f"Error indexing document: {str(e)}")
+                    # Continue without failing if indexing fails
+        except Exception as e:
+            logger.error(f"Error uploading document {filename}: {str(e)}")
+            # Continue with other files
+
+    if not uploaded_documents:
+        return jsonify({'error': 'No valid documents were uploaded'}), 400
+
+    # Return success with array of document data
+    if len(uploaded_documents) == 1:
+        return jsonify({'success': True, 'message': 'Document uploaded successfully', 'document': uploaded_documents[0]})
+    else:
+        return jsonify({'success': True, 'message': f'{len(uploaded_documents)} documents uploaded successfully', 'documents': uploaded_documents})
 
 @app.route("/api/motivational")
 def api_reading():
@@ -454,31 +516,104 @@ def subject_chat(subject_id):
 def retrieve_document_context(subject_id, query):
     """
     Retrieve relevant document content from Azure AI Search based on the query
+    If Azure AI Search is not available, fall back to direct document extraction
     """
     try:
+        # Log the incoming query for debugging
+        logger.info(f"Searching for documents with query: '{query}' in subject_id: '{subject_id}'")
+
+        if not query or query.strip() == "":
+            logger.warning("Empty query provided to retrieve_document_context")
+            return "No document context available - search query was empty."
+
+        # Extract key terms from the query to improve search
+        search_query = query
+        if len(query) > 100:  # If query is long, extract key terms
+            search_query = extract_search_terms(query)
+            logger.info(f"Original query was long. Using extracted search terms: '{search_query}'")
+
         # Check if we have Azure Search credentials
         if app.config.get('AZURE_SEARCH_ENDPOINT') and app.config.get('AZURE_SEARCH_API_KEY'):
             search_client = get_search_client()
-            return get_relevant_context(search_client, query, subject_id)
-        # Fall back to basic context if no Azure Search
+
+            # First try to use Azure AI Search
+            if search_client.is_available:
+                context = get_relevant_context(search_client, search_query, subject_id)
+                # If we got a meaningful context, return it
+                if context and not context.startswith("Error") and not context.startswith("Azure AI Search is not available"):
+                    return context
+                # Otherwise, log the issue and continue to fallback
+                logger.warning(f"Azure AI Search retrieval failed for query: '{search_query}', falling back to direct document extraction")
+
+        # Fall back to direct document extraction (either Azure Search is unavailable or failed)
         mongo_client = get_mongodb_client()
         documents = mongo_client.get_subject_documents(subject_id)
-        if (not documents):
+
+        if not documents:
             return 'No documents available for this subject yet.'
-        # Get a sample of content from the first document
-        if documents:
-            doc = documents[0]
+
+        # Prepare a more comprehensive context from available documents
+        context_parts = []
+
+        # Try to get content from multiple documents (up to 3)
+        for idx, doc in enumerate(documents[:3]):
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], doc['storage_path'])
             if os.path.exists(file_path):
                 text = extract_document_text(file_path)
                 if text:
-                    # Return a sample of the text (first 500 characters)
-                    sample = ((text[:500] + '...') if (len(text) > 500) else text)
-                    return f"Sample from {doc['filename']}:\n\n{sample}\n\nNote: In a production environment, a more sophisticated document retrieval system would be used."
-        return 'Document content could not be retrieved. This is a development version without proper Azure AI Search integration.'
+                    # Extract a reasonable sample from the document (first 1000 characters)
+                    sample = ((text[:1000] + '...') if (len(text) > 1000) else text)
+                    context_parts.append(f"Document: {doc['filename']}\n\n{sample}")
+
+                    # If we've already got a decent amount of content, stop here
+                    if len('\n\n---\n\n'.join(context_parts)) > 3000:
+                        break
+
+        if context_parts:
+            logger.info(f"Falling back to direct document extraction. Found {len(context_parts)} documents.")
+            return '\n\n---\n\n'.join(context_parts)
+        else:
+            return 'Document content could not be retrieved. Please check that the uploaded documents are in a supported format.'
+
     except Exception as e:
         logger.error(f"Error retrieving document context: {str(e)}")
         return f"Error retrieving document context: {str(e)}"
+
+def extract_search_terms(query, max_terms=5):
+    """
+    Extract key search terms from a long query to improve search results
+    """
+    try:
+        # Remove common words and keep nouns and key terms
+        words = query.lower().split()
+        # Common English stop words to filter out
+        stop_words = {'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were',
+                      'be', 'been', 'being', 'to', 'of', 'for', 'with', 'about', 'against',
+                      'between', 'into', 'through', 'during', 'before', 'after', 'above',
+                      'below', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over',
+                      'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when',
+                      'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+                      'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
+                      'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should',
+                      'now', 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those'}
+
+        # Keep words that are not stop words and are at least 3 characters long
+        filtered_words = [word for word in words if word not in stop_words and len(word) >= 3]
+
+        # Get the most frequent terms (excluding very common words)
+        from collections import Counter
+        word_counts = Counter(filtered_words)
+        top_terms = [word for word, count in word_counts.most_common(max_terms)]
+
+        # Join the top terms back into a search query
+        if top_terms:
+            return ' '.join(top_terms)
+        else:
+            # If no good terms found, return the original query
+            return query
+    except Exception as e:
+        logger.error(f"Error extracting search terms: {str(e)}")
+        return query
 
 # Timetable Generator Routes
 @app.route('/timetable')
@@ -587,19 +722,19 @@ def generate_literature_review():
         query = request.json.get('query', '')
         if not query:
             return jsonify({"error": "No query provided"}), 400
-        
+
         # Call the run_lit_review function to generate the literature review
         logger.info(f"Generating literature review for query: {query}")
         report_path = run_lit_review(query)
-        
+
         # Check if the report was generated successfully
         if not report_path or not os.path.exists(report_path):
             return jsonify({"error": "Failed to generate literature review report"}), 500
-        
+
         # Read the report content
         with open(report_path, 'r') as f:
             report_content = f.read()
-        
+
         return jsonify({"success": True, "report": report_content})
     except Exception as e:
         logger.error(f"Error generating literature review: {str(e)}")

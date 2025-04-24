@@ -21,12 +21,16 @@
                     <h4 class="text-md font-medium mb-2">Upload New Document</h4>
                     <form id="upload-form" class="flex flex-col gap-3">
                         <div class="relative border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                            <input type="file" id="document-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,.docx,.txt,.md">
+                            <input type="file" id="document-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,.docx,.txt,.md" multiple>
                             <div class="flex flex-col items-center justify-center">
                                 <span class="material-icons text-gray-400 text-3xl mb-2">upload_file</span>
-                                <p class="text-gray-500 text-sm">Drag & drop a file here or click to browse</p>
+                                <p class="text-gray-500 text-sm">Drag & drop files here or click to browse</p>
                                 <p class="text-gray-400 text-xs mt-1">Supported formats: PDF, DOCX, TXT, MD</p>
                             </div>
+                        </div>
+                        <div id="selected-file-name" class="hidden text-blue-600 text-sm p-2 bg-blue-50 rounded flex items-center">
+                            <span class="material-icons text-blue-500 mr-2" style="font-size: 1rem;">description</span>
+                            <span id="file-name-text" class="truncate"></span>
                         </div>
                         <div id="upload-status" class="hidden">
                             <div class="bg-blue-100 text-blue-700 p-2 rounded flex items-center">
@@ -34,7 +38,7 @@
                                 <span id="upload-status-text">Uploading...</span>
                             </div>
                         </div>
-                        <button type="submit" id="upload-button" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button type="submit" id="upload-button" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:bg-gray-400" disabled>
                             <span class="material-icons mr-2">cloud_upload</span>
                             <span>Upload Document</span>
                         </button>
@@ -122,16 +126,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadStatus = document.getElementById('upload-status');
     const uploadStatusText = document.getElementById('upload-status-text');
     const documentsList = document.getElementById('documents-list');
+    const selectedFileName = document.getElementById('selected-file-name');
+    const fileNameText = document.getElementById('file-name-text');
 
     // Debug: Verify subject ID
     console.log("Subject ID:", "{{ subject._id }}");
 
-    // Show file name when selected
+    // Show file name when selected and enable/disable button
     documentInput.addEventListener('change', function() {
+        console.log("File input changed, files:", this.files.length);
+
         if (this.files.length > 0) {
+            // Enable the upload button
             uploadButton.disabled = false;
+            console.log("Button enabled");
+
+            // Show the selected file name area
+            selectedFileName.classList.remove('hidden');
+
+            // Display appropriate text based on number of files
+            if (this.files.length === 1) {
+                fileNameText.textContent = this.files[0].name;
+            } else {
+                fileNameText.textContent = `${this.files.length} files selected`;
+            }
         } else {
+            // Disable the upload button
             uploadButton.disabled = true;
+            console.log("Button disabled");
+
+            // Hide the selected file name area
+            selectedFileName.classList.add('hidden');
+            fileNameText.textContent = '';
         }
     });
 
@@ -139,11 +165,17 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadForm.addEventListener('submit', function(e) {
         e.preventDefault();
 
-        if (!documentInput.files.length) return;
+        if (!documentInput.files.length) {
+            uploadButton.disabled = true;
+            return;
+        }
 
-        const file = documentInput.files[0];
         const formData = new FormData();
-        formData.append('document', file);
+
+        // Add each file to the FormData
+        for (let i = 0; i < documentInput.files.length; i++) {
+            formData.append('documents', documentInput.files[i]);
+        }
 
         // Show upload status
         uploadStatus.classList.remove('hidden');
@@ -151,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Get the subject ID directly from the template - ensure it's not empty
         const subjectId = "{{ subject._id }}";
-        
+
         if (!subjectId || subjectId === "None" || subjectId === "") {
             console.error("Subject ID is missing or invalid:", subjectId);
             uploadStatus.classList.remove('hidden');
@@ -162,11 +194,11 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadStatus.classList.add('bg-red-100', 'text-red-700');
             return;
         }
-        
+
         // Send file to API with confirmed subject ID
         const uploadUrl = `/subjects/${subjectId}/upload`;
         console.log("Uploading to:", uploadUrl);
-        
+
         fetch(uploadUrl, {
             method: 'POST',
             body: formData
@@ -179,23 +211,13 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
             uploadStatus.classList.add('hidden');
-            uploadButton.disabled = false;
+            uploadButton.disabled = true;
             documentInput.value = '';
+            selectedFileName.classList.add('hidden');
+            fileNameText.textContent = '';
 
-            // Add document to the list
-            if (documentsList.querySelector('.text-gray-500')) {
-                documentsList.innerHTML = ''; // Remove "No documents" message
-            }
-
-            const docElement = document.createElement('div');
-            docElement.className = 'border rounded-lg p-3 flex items-center';
-            docElement.innerHTML = `
-                <span class="material-icons text-gray-500 mr-3">description</span>
-                <div class="flex-1 truncate">
-                    <p class="font-medium" title="${data.document.filename}">${data.document.filename}</p>
-                </div>
-            `;
-            documentsList.appendChild(docElement);
+            // After successful upload, refresh the page to show all documents including previously uploaded ones
+            window.location.reload();
         })
         .catch(error => {
             console.error('Error:', error);
@@ -213,6 +235,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 3000);
         });
     });
+
+    // Helper function to add a document to the documents list
+    function addDocumentToList(doc) {
+        const docElement = document.createElement('div');
+        docElement.className = 'border rounded-lg p-3 flex items-center';
+        docElement.innerHTML = `
+            <span class="material-icons text-gray-500 mr-3">description</span>
+            <div class="flex-1 truncate">
+                <p class="font-medium" title="${doc.filename}">${doc.filename}</p>
+            </div>
+        `;
+        documentsList.appendChild(docElement);
+    }
 
     // Subject-specific chat functionality
     const subjectChatForm = document.getElementById('subject-chat-form');
