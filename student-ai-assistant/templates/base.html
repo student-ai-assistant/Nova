@@ -41,6 +41,12 @@
                                 <span>Timetable Generator</span>
                             </a>
                         </li>
+                        <li class="mb-3">
+                            <a href="{{ url_for('research_assistant') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/research-assistant' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">science</span>
+                                <span>Research Assistant</span>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>

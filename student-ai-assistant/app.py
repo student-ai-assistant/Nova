@@ -16,6 +16,7 @@ from mongodb_utils import MongoDBClient
 from journal_utils import JournalExtractor
 from motivational_utils import motivational , get_values
 from timetable_agent import TimetableAgentSystem
+from agents.research_agent import run_lit_review
 
 
 # Configure logging
@@ -455,6 +456,38 @@ def download_timetable():
     except Exception as e:
         logger.error(f"Error downloading timetable: {str(e)}")
         return jsonify({'error': f"Error downloading timetable: {str(e)}"}), 500
+
+# Research Assistant Routes
+@app.route('/research-assistant/')
+def research_assistant():
+    """Render the research assistant page with literature review functionality"""
+    return render_template('research_assistant.html')
+
+@app.route('/api/research-assistant/generate', methods=['POST'])
+def generate_literature_review():
+    """API endpoint for generating a literature review using the run_lit_review function"""
+    try:
+        # Get the query from the request
+        query = request.json.get('query', '')
+        if not query:
+            return jsonify({"error": "No query provided"}), 400
+        
+        # Call the run_lit_review function to generate the literature review
+        logger.info(f"Generating literature review for query: {query}")
+        report_path = run_lit_review(query)
+        
+        # Check if the report was generated successfully
+        if not report_path or not os.path.exists(report_path):
+            return jsonify({"error": "Failed to generate literature review report"}), 500
+        
+        # Read the report content
+        with open(report_path, 'r') as f:
+            report_content = f.read()
+        
+        return jsonify({"success": True, "report": report_content})
+    except Exception as e:
+        logger.error(f"Error generating literature review: {str(e)}")
+        return jsonify({"error": f"Error generating literature review: {str(e)}"}), 500
 
 # Clean up resources when app is shutting down
 @app.teardown_appcontext
