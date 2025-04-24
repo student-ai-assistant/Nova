@@ -10,10 +10,14 @@ from docx import Document
 import markdown
 import re
 from pathlib import Path
+import warnings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Suppress specific pdfminer warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='pdfminer.pdfpage')
 
 def extract_text_from_pdf(file_path: str) -> str:
     """
@@ -207,12 +211,13 @@ def prepare_document_for_indexing(doc_info: Dict[str, Any], subject_name: str,
         documents = []
         for i, chunk in enumerate(text_chunks):
             # Create a unique ID for each chunk
-            chunk_id = f"{doc_info['id']}_{i}"
+            chunk_id = f"{doc_info['_id']}_{i}"
 
+            # Ensure field names match exactly with the index schema
             document = {
                 "id": chunk_id,
-                "document_id": doc_info['id'],
-                "document_name": doc_info['name'],
+                "document_id": doc_info['_id'],
+                "document_name": doc_info['filename'],
                 "subject_id": doc_info.get('subject_id', ''),
                 "subject_name": subject_name,
                 "chunk_id": i,
@@ -222,6 +227,7 @@ def prepare_document_for_indexing(doc_info: Dict[str, Any], subject_name: str,
 
             documents.append(document)
 
+        logger.info(f"Prepared {len(documents)} document chunks for indexing from {file_path}")
         return documents
 
     except Exception as e:

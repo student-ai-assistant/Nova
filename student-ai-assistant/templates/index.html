@@ -1,11 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}General Chat - Student AI Assistant{% endblock %}
+{% block title %}General Chat - Nova{% endblock %}
 
-{% block header_title %}General Chat{% endblock %}
+{% block header_title %}Nova{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto flex flex-col h-full">
+    <!-- Centered Motivational Message -->
+    <div id="motivational-container" class="flex-grow flex items-center justify-center mb-4">
+        <div class="text-center p-6 rounded-lg bg-white shadow-lg max-w-2xl">
+            <h2 class="text-2xl font-bold text-blue-600 mb-4">Welcome!</h2>
+            <p id="motivational" class="text-xl text-gray-700">Loading...</p>
+            <p class="text-sm text-gray-500 mt-4">Start chatting below to begin your study session</p>
+        </div>
+    </div>
+
     <!-- Chat Messages Area -->
     <div id="chat-messages" class="flex-1 overflow-y-auto mb-4 p-4 bg-white rounded-lg shadow space-y-4">
         <!-- Welcome Message -->
@@ -14,7 +23,7 @@
                 <span class="material-icons">smart_toy</span>
             </div>
             <div class="message-content bg-blue-100 p-3 rounded-lg max-w-3xl">
-                <p id="motivational">Loading…</p>
+                <p>How can I assist you with your studies today?</p>
             </div>
         </div>
         <!-- Messages will be added here dynamically -->
@@ -24,10 +33,23 @@
     <div class="bg-white p-4 rounded-lg shadow">
         <form id="chat-form" class="flex items-end">
             <textarea id="user-input" class="flex-1 border rounded-lg resize-none p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[50px]" placeholder="Type your message here..." rows="2"></textarea>
-            <button type="submit" class="ml-2 bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-colors">
-                <span class="material-icons">send</span>
-            </button>
+            <div class="flex ml-2">
+                <label for="file-upload" class="cursor-pointer bg-gray-200 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors mr-2">
+                    <span class="material-icons">attach_file</span>
+                    <input type="file" id="file-upload" class="hidden" />
+                </label>
+                <button type="submit" class="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 transition-colors">
+                    <span class="material-icons">send</span>
+                </button>
+            </div>
         </form>
+        <div id="file-info" class="hidden mt-2 text-sm text-gray-600 flex items-center">
+            <span class="material-icons text-green-500 mr-1">description</span>
+            <span id="file-name"></span>
+            <button id="remove-file" class="ml-2 text-red-500">
+                <span class="material-icons text-sm">close</span>
+            </button>
+        </div>
         <div id="typing-indicator" class="hidden mt-2 text-sm text-gray-500">
             <span class="material-icons animate-pulse">more_horiz</span>
             <span>AI is thinking...</span>
@@ -38,9 +60,7 @@
 
 {% block extra_js %}
 <script>
-
-
-
+// Fetch motivational message on page load
 fetch("/api/motivational")
   .then(r => r.json())
   .then(data => {
@@ -53,6 +73,47 @@ document.addEventListener('DOMContentLoaded', function() {
     const userInput = document.getElementById('user-input');
     const chatMessages = document.getElementById('chat-messages');
     const typingIndicator = document.getElementById('typing-indicator');
+    const fileUpload = document.getElementById('file-upload');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const removeFile = document.getElementById('remove-file');
+    const motivationalContainer = document.getElementById('motivational-container');
+
+    // Variable to store the uploaded file content
+    let uploadedFile = null;
+    let firstMessageSent = false;
+
+    // Handle file upload
+    fileUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            fileName.textContent = file.name;
+            fileInfo.classList.remove('hidden');
+
+            // Read the file content
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                uploadedFile = {
+                    name: file.name,
+                    content: event.target.result,
+                    type: file.type
+                };
+            };
+
+            if (file.type.startsWith('text/')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsDataURL(file);
+            }
+        }
+    });
+
+    // Remove uploaded file
+    removeFile.addEventListener('click', function() {
+        uploadedFile = null;
+        fileUpload.value = '';
+        fileInfo.classList.add('hidden');
+    });
 
     // Auto resize textarea as user types
     userInput.addEventListener('input', function() {
@@ -75,8 +136,32 @@ document.addEventListener('DOMContentLoaded', function() {
         const message = userInput.value.trim();
         if (!message) return;
 
+        // Hide motivational message on first message sent
+        if (!firstMessageSent) {
+            motivationalContainer.classList.add('hidden');
+            chatMessages.classList.remove('flex-1');
+            chatMessages.classList.add('flex-grow');
+            firstMessageSent = true;
+        }
+
         // Add user message to chat
         addMessage(message, 'user');
+
+        // Prepare payload for API
+        const payload = { message: message };
+
+        // Add file content to payload if available
+        if (uploadedFile) {
+            payload.file = uploadedFile;
+
+            // Show file was included in message
+            addFileAttachmentMessage(uploadedFile.name);
+
+            // Clear file upload after sending
+            uploadedFile = null;
+            fileUpload.value = '';
+            fileInfo.classList.add('hidden');
+        }
 
         // Clear input
         userInput.value = '';
@@ -94,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ message: message }),
+            body: JSON.stringify(payload),
         })
         .then(response => {
             if (!response.ok) {
@@ -121,6 +206,24 @@ document.addEventListener('DOMContentLoaded', function() {
             scrollToBottom();
         });
     });
+
+    // Function to add file attachment message
+    function addFileAttachmentMessage(filename) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message flex justify-end';
+
+        messageDiv.innerHTML = `
+            <div class="message-content bg-green-100 p-3 rounded-lg mr-3 max-w-3xl flex items-center">
+                <span class="material-icons mr-2">description</span>
+                <p>Uploaded: ${filename}</p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white flex-shrink-0 ml-3">
+                <span class="material-icons">person</span>
+            </div>
+        `;
+
+        chatMessages.appendChild(messageDiv);
+    }
 
     // Function to add message to chat
     function addMessage(content, sender, isError = false) {

@@ -9,6 +9,13 @@ import json
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.models import QueryType
+from azure.search.documents.indexes import SearchIndexClient
+from azure.search.documents.indexes.models import (
+    SearchIndex,
+    SimpleField,
+    SearchableField,
+    SearchFieldDataType
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,11 +37,71 @@ class AzureSearchClient:
         self.api_key = api_key
         self.index_name = index_name
         self.credential = AzureKeyCredential(api_key)
-        self.search_client = SearchClient(
-            endpoint=endpoint,
-            index_name=index_name,
-            credential=self.credential
-        )
+        self.is_available = True
+
+        try:
+            self.index_client = SearchIndexClient(endpoint=endpoint, credential=self.credential)
+
+            # Ensure index exists before initializing search client
+            if not self.ensure_index_exists():
+                self.is_available = False
+                logger.warning("Azure AI Search index could not be created or accessed. Search functionality will be limited.")
+
+            self.search_client = SearchClient(
+                endpoint=endpoint,
+                index_name=index_name,
+                credential=self.credential
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize Azure AI Search client: {str(e)}")
+            self.is_available = False
+
+    def ensure_index_exists(self) -> bool:
+        """
+        Ensure that the search index exists, creating it if necessary
+
+        Returns:
+            True if index exists or was created successfully, False otherwise
+        """
+        try:
+            # Check if index exists
+            try:
+                indexes = list(self.index_client.list_indexes())
+                if self.index_name in [index.name for index in indexes]:
+                    logger.info(f"Index '{self.index_name}' already exists")
+                    return True
+            except Exception as e:
+                logger.error(f"Error checking if index exists: {str(e)}")
+                return False
+
+            # Create index if it doesn't exist
+            logger.info(f"Creating index '{self.index_name}'")
+
+            # Define index fields
+            fields = [
+                SimpleField(name="id", type=SearchFieldDataType.String, key=True),
+                SimpleField(name="document_id", type=SearchFieldDataType.String),
+                SimpleField(name="document_name", type=SearchFieldDataType.String),
+                SimpleField(name="subject_id", type=SearchFieldDataType.String, filterable=True),
+                SimpleField(name="subject_name", type=SearchFieldDataType.String),
+                SimpleField(name="chunk_id", type=SearchFieldDataType.Int32),
+                SearchableField(name="content", type=SearchFieldDataType.String),
+                SimpleField(name="file_path", type=SearchFieldDataType.String)
+            ]
+
+            # Create the index
+            try:
+                index = SearchIndex(name=self.index_name, fields=fields)
+                self.index_client.create_or_update_index(index)
+                logger.info(f"Index '{self.index_name}' created successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Error creating index: {str(e)}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error ensuring index exists: {str(e)}")
+            return False
 
     def create_or_update_index(self, fields: List[Dict[str, Any]]) -> bool:
         """
@@ -46,6 +113,10 @@ class AzureSearchClient:
         Returns:
             True if successful, False otherwise
         """
+        if not self.is_available:
+            logger.warning("Azure AI Search is not available. Cannot create/update index.")
+            return False
+
         try:
             # In a production app, use the management client to create/update the index
             # This would require more detailed field definitions
@@ -65,6 +136,10 @@ class AzureSearchClient:
         Returns:
             Number of documents successfully uploaded
         """
+        if not self.is_available:
+            logger.warning("Azure AI Search is not available. Cannot upload documents.")
+            return 0
+
         try:
             if not documents:
                 return 0
@@ -84,6 +159,7 @@ class AzureSearchClient:
 
         except Exception as e:
             logger.error(f"Error uploading documents: {str(e)}")
+            self.is_available = False
             return 0
 
     def search(self, query: str, subject_id: str = None,
@@ -100,6 +176,10 @@ class AzureSearchClient:
         Returns:
             List of search results
         """
+        if not self.is_available:
+            logger.warning("Azure AI Search is not available. Cannot perform search.")
+            return []
+
         try:
             # Construct filter
             filters = []
@@ -128,10 +208,11 @@ class AzureSearchClient:
 
         except Exception as e:
             logger.error(f"Error searching documents: {str(e)}")
+            self.is_available = False
             return []
 
 def get_relevant_context(search_client: AzureSearchClient, query: str,
-                         subject_id: str, max_results: int = 3) -> str:
+                         subject_id: str, max_results: int = 5) -> str:
     """
     Get relevant context from documents based on the query
 
@@ -145,11 +226,19 @@ def get_relevant_context(search_client: AzureSearchClient, query: str,
         Concatenated relevant context as a string
     """
     try:
+        # Check if search client is available
+        if not search_client.is_available:
+            return "Azure AI Search is not available. Unable to retrieve context from documents. Please check your configuration."
+
         # Search for relevant document chunks
         results = search_client.search(query=query, subject_id=subject_id, top=max_results)
 
         if not results:
+            logger.info(f"No search results found for query: '{query}' in subject_id: '{subject_id}'")
             return "No relevant information found in the uploaded documents."
+
+        # Log success to help with debugging
+        logger.info(f"Found {len(results)} document chunks relevant to query: '{query}'")
 
         # Combine the content from the results
         context_parts = []

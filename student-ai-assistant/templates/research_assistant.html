@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+
+{% block title %}Research Assistant - Literature Review{% endblock %}
+
+{% block header_title %}Research Assistant - Literature Review{% endblock %}
+
+{% block extra_css %}
+<style>
+    .loading {
+        display: inline-block;
+        width: 80px;
+        height: 80px;
+    }
+    .loading:after {
+        content: " ";
+        display: block;
+        width: 64px;
+        height: 64px;
+        margin: 8px;
+        border-radius: 50%;
+        border: 6px solid #3B82F6;
+        border-color: #3B82F6 transparent #3B82F6 transparent;
+        animation: loading 1.2s linear infinite;
+    }
+    @keyframes loading {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+    
+    /* Enhanced Markdown styling */
+    #report-content {
+        line-height: 1.7;
+        color: #333;
+        font-size: 1.05rem;
+    }
+    #report-content h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #eaecef;
+        color: #1F2937;
+    }
+    #report-content h2 {
+        font-size: 1.6rem;
+        font-weight: 600;
+        margin-top: 1.4rem;
+        margin-bottom: 0.8rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid #eaecef;
+        color: #1F2937;
+    }
+    #report-content h3 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-top: 1.3rem;
+        margin-bottom: 0.7rem;
+        color: #374151;
+    }
+    #report-content h4 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        margin-top: 1.2rem;
+        margin-bottom: 0.6rem;
+        color: #374151;
+    }
+    #report-content p {
+        margin-bottom: 1.2rem;
+    }
+    #report-content ul, #report-content ol {
+        padding-left: 2rem;
+        margin-bottom: 1.2rem;
+    }
+    #report-content ul {
+        list-style-type: disc;
+    }
+    #report-content ol {
+        list-style-type: decimal;
+    }
+    #report-content li {
+        margin-bottom: 0.5rem;
+    }
+    #report-content blockquote {
+        padding: 0.5rem 1rem;
+        color: #4B5563;
+        border-left: 0.25rem solid #E5E7EB;
+        background-color: #F9FAFB;
+        margin: 1.2rem 0;
+        border-radius: 0.25rem;
+    }
+    #report-content pre {
+        padding: 1rem;
+        overflow: auto;
+        font-size: 0.9rem;
+        line-height: 1.45;
+        background-color: #F9FAFB;
+        border-radius: 0.375rem;
+        margin-bottom: 1.2rem;
+        border: 1px solid #E5E7EB;
+    }
+    #report-content code {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.9rem;
+        background-color: #F1F5F9;
+        border-radius: 0.25rem;
+        font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    #report-content hr {
+        height: 0.2rem;
+        padding: 0;
+        margin: 1.5rem 0;
+        background-color: #E5E7EB;
+        border: 0;
+    }
+    #report-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1.2rem 0;
+    }
+    #report-content table th, #report-content table td {
+        padding: 0.75rem;
+        border: 1px solid #E5E7EB;
+    }
+    #report-content table th {
+        background-color: #F9FAFB;
+        font-weight: 600;
+    }
+    #report-content img {
+        max-width: 100%;
+        margin: 1rem 0;
+        border-radius: 0.375rem;
+    }
+    #report-content a {
+        color: #2563EB;
+        text-decoration: none;
+    }
+    #report-content a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4">
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h1 class="text-2xl font-bold mb-4">Literature Review Generator</h1>
+        <p class="mb-4">Enter a query to generate a literature review. The system will search for relevant academic papers and create a comprehensive literature review report.</p>
+        
+        <div class="mb-6">
+            <form id="lit-review-form">
+                <div class="mb-4">
+                    <label for="query" class="block text-sm font-medium text-gray-700 mb-2">Research Query</label>
+                    <textarea id="query" name="query" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter your research query or topic..."></textarea>
+                </div>
+                <div>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        Generate Literature Review
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Loading indicator -->
+    <div id="loading-container" class="hidden bg-white rounded-lg shadow-md p-6 mb-6 text-center">
+        <div class="loading mx-auto"></div>
+        <p class="mt-4 text-lg font-medium">Generating literature review...</p>
+        <p class="text-gray-600">This may take several minutes. Please be patient.</p>
+    </div>
+    
+    <!-- Report display -->
+    <div id="report-container" class="hidden bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold">Literature Review Report</h2>
+            <button id="download-report" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download
+            </button>
+        </div>
+        <div id="report-content" class="prose max-w-none px-1 py-2">
+            <!-- The report content will be inserted here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('lit-review-form');
+        const loadingContainer = document.getElementById('loading-container');
+        const reportContainer = document.getElementById('report-container');
+        const reportContent = document.getElementById('report-content');
+        const downloadButton = document.getElementById('download-report');
+        
+        // Configure marked.js for better rendering
+        marked.setOptions({
+            breaks: true,            // Interpret line breaks as <br>
+            gfm: true,               // Enable GitHub Flavored Markdown
+            headerIds: true,         // Generate IDs for headings
+            mangle: false,           // Don't escape HTML
+            sanitize: false,         // Don't sanitize HTML
+            smartLists: true,        // Use smarter list behavior
+            smartypants: true,       // Use "smart" typographic punctuation
+            xhtml: true              // Self-close HTML tags
+        });
+        
+        let reportData = null; // Variable to store the report content
+        
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const query = document.getElementById('query').value.trim();
+            if (!query) {
+                alert('Please enter a research query.');
+                return;
+            }
+            
+            // Show loading indicator, hide report container
+            loadingContainer.classList.remove('hidden');
+            reportContainer.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/research-assistant/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                loadingContainer.classList.add('hidden');
+                
+                if (response.ok) {
+                    // Show report container and populate with content
+                    reportContainer.classList.remove('hidden');
+                    
+                    // Use marked.js to render Markdown
+                    if (data.report) {
+                        reportData = data.report; // Store report for download
+                        reportContent.innerHTML = marked.parse(data.report);
+                        
+                        // Handle specific elements after rendering
+                        enhanceReportDisplay();
+                        
+                        // Scroll to report
+                        reportContainer.scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        reportContent.innerHTML = '<p class="text-red-500">No report content received.</p>';
+                    }
+                } else {
+                    alert(`Error: ${data.error || 'Failed to generate literature review.'}`);
+                }
+            } catch (error) {
+                loadingContainer.classList.add('hidden');
+                alert('An error occurred while generating the literature review. Please try again later.');
+                console.error('Error:', error);
+            }
+        });
+        
+        // Function to enhance the display of the rendered report
+        function enhanceReportDisplay() {
+            // Add classes to tables
+            const tables = reportContent.querySelectorAll('table');
+            tables.forEach(table => {
+                table.classList.add('w-full', 'border-collapse');
+                const tableHeads = table.querySelectorAll('th');
+                tableHeads.forEach(th => th.classList.add('bg-gray-50', 'p-2', 'border', 'border-gray-200'));
+                const tableCells = table.querySelectorAll('td');
+                tableCells.forEach(td => td.classList.add('p-2', 'border', 'border-gray-200'));
+            });
+            
+            // Add classes to links
+            const links = reportContent.querySelectorAll('a');
+            links.forEach(link => {
+                link.classList.add('text-blue-600', 'hover:underline');
+                // Open external links in new tab
+                if (link.getAttribute('href') && link.getAttribute('href').startsWith('http')) {
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
+                }
+            });
+            
+            // Add classes to images
+            const images = reportContent.querySelectorAll('img');
+            images.forEach(img => {
+                img.classList.add('mx-auto', 'rounded-lg', 'shadow-sm');
+                img.setAttribute('loading', 'lazy');
+            });
+            
+            // Add classes to blockquotes
+            const blockquotes = reportContent.querySelectorAll('blockquote');
+            blockquotes.forEach(quote => {
+                quote.classList.add('italic');
+            });
+            
+            // Add classes to code blocks
+            const codeBlocks = reportContent.querySelectorAll('pre code');
+            codeBlocks.forEach(code => {
+                code.parentElement.classList.add('text-sm', 'rounded-md', 'overflow-auto');
+            });
+        }
+        
+        // Download report as markdown file
+        downloadButton.addEventListener('click', function() {
+            if (!reportData) return;
+            
+            const blob = new Blob([reportData], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            // Create filename from the first line of the report
+            let filename = 'literature-review.md';
+            const firstLine = reportData.split('\n')[0];
+            if (firstLine && firstLine.startsWith('#')) {
+                filename = firstLine.replace(/^#+\s+/, '').trim() // Remove heading symbols
+                                    .replace(/\s+/g, '-') // Replace spaces with hyphens
+                                    .replace(/[^\w\-]/g, '') // Remove special characters
+                                    .toLowerCase() + '.md';
+            }
+            
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Timetable Generator | Student AI Assistant{% endblock %}
+{% block title %}Timetable Generator | Nova{% endblock %}
 
 {% block header_title %}Timetable Generator{% endblock %}
 
@@ -536,10 +536,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Format day/date
-                let dayDisplay = session.day;
+                let dayDisplay = session.day || '';
                 if (session.date) {
-                    if (!dayDisplay.includes(session.date)) {
-                        dayDisplay += ` (${formatDate(session.date)})`;
+                    // Check if the day already contains the date to avoid duplication
+                    const formattedDate = formatDate(session.date);
+                    if (!dayDisplay.includes(formattedDate.split(',')[0]) && !dayDisplay.includes(formattedDate.split(',')[1])) {
+                        dayDisplay = formattedDate;
                     }
                 }
 
