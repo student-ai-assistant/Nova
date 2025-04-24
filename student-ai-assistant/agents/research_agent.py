@@ -1,10 +1,8 @@
 
 import os
-os.environ['LLAMA_CLOUD_API_KEY'] = 'llx-57leIBOeFARXE4hPwJoADhfgXK8uaWiA3FmVbXQ82QXLT478'
-os.environ['TOGETHER_API_KEY'] = '714ebaca2e6f19ceac63a29def9a8c0186eae4b61e7498185cf900d45c1f1902'
-os.environ['GROQ_API_KEY'] = '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'
 
-
+from dotenv import load_dotenv
+load_dotenv('../.env')
 
 
 import os
@@ -58,21 +56,43 @@ model_client = OpenAIChatCompletionClient(
 )
 
 
-model_client_together = OpenAIChatCompletionClient(
-    model="meta-llama/Llama-Vision-Free",
-    base_url="https://api.together.xyz/v1",
-    max_tokens=10000,
-    api_key=TOGETHER_API_KEY,
+# model_client_together = OpenAIChatCompletionClient(
+#     model="meta-llama/Llama-Vision-Free",
+#     base_url="https://api.together.xyz/v1",
+#     max_tokens=10000,
+#     api_key=TOGETHER_API_KEY,
+#     model_info={
+#         "vision": False,
+#         "function_calling": True,
+#         "json_output": False,
+#         "functional_calling": True,
+#         "family": "unknown",
+#     }
+# )
+
+
+
+
+
+
+
+from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
+
+
+model_client_bm = AzureOpenAIChatCompletionClient(
+    model="gpt-4o-mini",
+    azure_deployment="gpt-4o-mini",
+    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+    api_key=os.environ["AZURE_OPENAI_API_KEY"],
+    api_version="2024-12-01-preview",
     model_info={
-        "vision": False,
-        "function_calling": True,
         "json_output": False,
-        "functional_calling": True,
+        "function_calling": True,
+        "vision": False,
         "family": "unknown",
-    }
+        "structured_output": False,
+    },
 )
-
-
 
 
 
@@ -150,6 +170,12 @@ def remove_reference_section(pdf_path: str, out_path: str):
     return None
 
 
+def sanitize_filename(filename: str, replacement: str = "_") -> str:
+    # Define the set of invalid characters (Windows)
+    invalid_chars = r'[<>:"/\\|?*]'
+    # Replace each invalid character with the replacement (e.g., underscore)
+    return re.sub(invalid_chars, replacement, filename)
+
 
 def get_papers(query: str, num_papers: int):
     '''
@@ -165,6 +191,7 @@ def get_papers(query: str, num_papers: int):
     for paper in query_semantic_scholar(query, NUM_SEARCH_RESULTS):
         try:
             fname = paper['title'].replace(' ', '_') 
+            fname = sanitize_filename(fname)
             paper_folder = os.path.join(PAPER_SAVE_DIR, fname)
             os.makedirs(paper_folder, exist_ok=True)
             out_path = os.path.join(paper_folder, f"paper.pdf")
@@ -687,11 +714,11 @@ async def literature_review(user_query):
     )
 
     await SummarizerAgent.register(
-        runtime, type=paper_summarizer, factory=lambda: SummarizerAgent(model_client=model_client_together)
+        runtime, type=paper_summarizer, factory=lambda: SummarizerAgent(model_client=model_client_bm)
     )
         
     await ReportGeneratorAgent.register(
-        runtime, type=report_generator_type, factory=lambda: ReportGeneratorAgent(model_client=model_client_together)
+        runtime, type=report_generator_type, factory=lambda: ReportGeneratorAgent(model_client=model_client_bm)
     )
 
     # await UserAgent.register(
@@ -701,7 +728,7 @@ async def literature_review(user_query):
     # MAX_FEEDBACK_MESSAGES = 5
 
     # await FeedbackHandlerAgent.register(
-    #     runtime, type=feedback_handler_agent_type, factory=lambda: FeedbackHandlerAgent(model_client=model_client_together, approve_word="approve", max_message_count=MAX_FEEDBACK_MESSAGES)
+    #     runtime, type=feedback_handler_agent_type, factory=lambda: FeedbackHandlerAgent(model_client=model_client_bm, approve_word="approve", max_message_count=MAX_FEEDBACK_MESSAGES)
     # )
 
 
