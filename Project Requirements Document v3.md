@@ -1,8 +1,10 @@
-# Project Requirements Document: Student AI Assistant - Timetable Generation Feature
+# Project Requirements Document: Nova
 
-### 1. Introduction (Supplement)
+## 1. Introduction
 
-This document details the requirements for adding a new "Timetable Generation" feature to the Student AI Assistant. This feature will utilize a multi-level AI agent architecture powered by Azure AI to create personalized study plans based on user-specified study goals, uploaded subject documents, and existing user journal entries stored in MongoDB Atlas.
+Nova is a Flask-based web application designed to help students with their studies. Leveraging the power of AI, Nova provides personalized assistance in various aspects of learning, including but not limited to, resource discovery, query resolution, and study planning. The application aims to integrate seamlessly into the student's academic life, offering support that is both intelligent and intuitive.
+
+This document details the requirements for adding a new "Timetable Generation" feature to Nova. This feature will utilize a multi-level AI agent architecture powered by Azure AI to create personalized study plans based on user-specified study goals, uploaded subject documents, and existing user journal entries stored in MongoDB Atlas.
 
 ### 2. Goals and Objectives (Supplement)
 

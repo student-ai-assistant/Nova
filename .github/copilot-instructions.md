@@ -1,10 +1,10 @@
-# Copilot Instructions for Student AI Assistant Flask Application
+# Copilot Instructions for Nova Flask Application
 
-This document provides guidelines and best practices for contributing to the development of the Student AI Assistant Flask application.
+This document provides guidelines and best practices for contributing to the development of the Nova Flask Application.
 
 ## Project Overview
 
-The Student AI Assistant is a Flask-based web application designed to help students with their studies. The application now features **user accounts with secure login/registration** and **data persistence tied to individual users**. The front page features a redesigned welcoming layout with a central motivational message and a general chat interface (with temporary file context upload). A subject-specific section allows logged-in users to upload documents for persistent storage (linked to their account) and chat with an AI agent using these documents as context, including an option to delete uploaded documents. A refined multi-level AI agent system generates personalized study timetables based on user documents and journal entries. A Literature Review feature allows users to generate research reports based on a query. A Quiz Generation feature enables students to create and take multiple-choice quizzes based on their subject documents. The application features an improved overall design with final touches and a dark mode toggle. The application utilizes MongoDB Atlas for persistent data storage (user accounts, subjects, document metadata, journals). The user interface aims for a modern aesthetic using Tailwind CSS and Material Design principles. **All user-specific data sections are now filtered to show only the logged-in user's data.**
+Nova is a Flask-based web application designed to help students with their studies. The application now features **user accounts with secure login/registration** and **data persistence tied to individual users**. The front page features a redesigned welcoming layout with a central motivational message and a general chat interface (with temporary file context upload). A subject-specific section allows logged-in users to upload documents for persistent storage (linked to their account) and chat with an AI agent using these documents as context, including an option to delete uploaded documents. A refined multi-level AI agent system generates personalized study timetables based on user documents and journal entries. A Literature Review feature allows users to generate research reports based on a query. A Quiz Generation feature enables students to create and take multiple-choice quizzes based on their subject documents. The application features an improved overall design with final touches and a dark mode toggle. The application utilizes MongoDB Atlas for persistent data storage (user accounts, subjects, document metadata, journals). The user interface aims for a modern aesthetic using Tailwind CSS and Material Design principles. **All user-specific data sections are now filtered to show only the logged-in user's data.**
 
 ## Technologies Used
 
@@ -21,7 +21,7 @@ The Student AI Assistant is a Flask-based web application designed to help stude
 Maintain a clear and organized directory structure for the Flask application. A suggested structure is as follows:
 
 ```
-student-ai-assistant/
+nova/
 ├── conda_env/              # Conda environment files (or specify environment name)
 ├── static/
 │   ├── css/

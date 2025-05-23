@@ -263,17 +263,17 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False, has_fil
         messages = [{'role': 'user', 'content': user_message}]
         # Add context if provided
         if context:
-            system_role = 'You are a helpful AI assistant for students.'
+            system_role = 'You are a helpful AI assistant for students named Nova.'
 
             # Enhance system message for file context
             if has_file_context:
-                system_role = 'You are a helpful AI assistant for students. You have been provided with a document for context. ' + \
+                system_role = 'You are a helpful AI assistant for students named Nova. You have been provided with a document for context. ' + \
                              'Pay close attention to the UPLOADED FILE CONTEXT section and use this information to provide a detailed and relevant response. ' + \
                              'If the document format makes it hard to interpret, acknowledge that and ask clarifying questions if needed.'
 
             # Add journal functionality information to the system message
             if is_subject_chat:
-                system_role = 'You are a knowledgeable AI assistant for students. ' + \
+                system_role = 'You are a knowledgeable AI assistant for students named Nova. ' + \
                               'You have been provided with information from documents related to this subject. ' + \
                               'IMPORTANT: Thoroughly examine the DOCUMENT INFORMATION section below and use that content to provide detailed answers. ' + \
                               'Try your best to answer based on what is provided in the document information. ' + \
@@ -342,7 +342,7 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False, has_fil
                 messages.insert(1, context_message)
         else:
             # Even without context, add information about journal functionality
-            system_role = 'You are a helpful AI assistant for students.'
+            system_role = 'You are a helpful AI assistant for students named Nova.'
             if is_subject_chat:
                 system_role += " IMPORTANT: I have the ability to remember important information you share with me. When you need me to remember something specific about this subject, please clearly state it with phrases like 'remember that...', 'note that...', or 'this is important:'. This information will be saved in your subject journal for future reference."
             else:
@@ -816,11 +816,11 @@ def extract_topics():
         if (not documents):
             return jsonify({"error": "No documents found for this subject"}), 404
 
-        # Initialize timetable agent system
-        timetable_system = get_timetable_agent_system()
+        # Initialize timetable agent
+        timetable_agent = get_timetable_agent_system()
 
         # Extract topics from documents using Agent 1
-        extraction_results = timetable_system.extract_topics_from_documents(documents=documents, upload_folder=app.config['UPLOAD_FOLDER'], scope=scope)
+        extraction_results = timetable_agent.extract_topics_from_documents(documents=documents, upload_folder=app.config['UPLOAD_FOLDER'], scope=scope)
 
         return jsonify({'success': True, 'subject': subject, 'extraction_results': extraction_results})
     except Exception as e:
@@ -859,11 +859,11 @@ def generate_timetable():
             limit=30
         )
 
-        # Initialize timetable agent system
-        timetable_system = get_timetable_agent_system()
+        # Initialize timetable agent
+        timetable_agent = get_timetable_agent_system()
 
         # Generate timetable using the multi-agent workflow
-        timetable_results = timetable_system.generate_timetable(extracted_topics=extracted_topics, journal_entries=user_journal_entries, timeframe=timeframe)
+        timetable_results = timetable_agent.generate_timetable(extracted_topics=extracted_topics, journal_entries=user_journal_entries, timeframe=timeframe)
 
         return jsonify({'success': True, 'subject': subject, 'timetable_results': timetable_results})
     except Exception as e:
@@ -900,7 +900,7 @@ def download_timetable():
 @app.route('/research-assistant/')
 def research_assistant():
     """Render the research assistant page with literature review functionality"""
-    return render_template('research_assistant.html')
+    return render_template('research_assistant.html', app_name="Nova")
 
 @app.route('/api/research-assistant/generate', methods=['POST'])
 def generate_literature_review():

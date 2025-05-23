@@ -1,8 +1,8 @@
-# Project Requirements Document: Student AI Assistant - Quiz Generation Feature
+# Project Requirements Document: Nova
 
-### 1. Introduction (Supplement)
+## 1. Introduction
 
-This document details the requirements for adding a "Quiz Generation" feature to the Student AI Assistant. This feature will enable students to create and take multiple-choice quizzes based on the documents associated with their saved subjects and specific topics within those subjects, utilizing AI to generate questions and score the results.
+Nova is a Flask-based web application designed to help students with their studies. It offers various features to assist in learning, including a Student AI Assistant that can generate quizzes based on the documents associated with the students' saved subjects and specific topics within those subjects. This document details the requirements for the Quiz Generation feature, which will enable students to create and take multiple-choice quizzes, utilizing AI to generate questions and score the results.
 
 ### 2. Goals and Objectives (Supplement)
 

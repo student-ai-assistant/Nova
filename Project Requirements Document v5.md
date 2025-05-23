@@ -1,8 +1,8 @@
-#   Project Requirements Document: Student AI Assistant - Literature Review Feature
+# Project Requirements Document: Nova
 
-###   1. Introduction (Supplement)
+## 1. Introduction
 
-This document details the requirements for adding a "Literature Review" feature to the Student AI Assistant. This feature will allow users to submit a query for a literature review, which will be processed by an AI agent to generate a report. The generated report will be displayed to the user within the application.
+Nova is a Flask-based web application designed to help students with their studies. It offers various features, including a "Literature Review" tool, which allows users to submit a query for a literature review. This query is processed by an AI agent to generate a report, which is then displayed to the user within the application.
 
 ###   2. Goals and Objectives (Supplement)
 

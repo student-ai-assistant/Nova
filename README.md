@@ -1,10 +1,10 @@
-# Student AI Assistant
+# Nova
 
 A Flask-based web application designed to help students with their studies through intelligent AI assistance, document-based learning, personalized study plans, research assistance, and quiz generation.
 
 ## Overview
 
-The Student AI Assistant provides an intuitive platform for students to:
+The Nova provides an intuitive platform for students to:
 
 - Chat with an AI assistant for general academic support with ability to upload temporary file context
 - Organize study materials by subject
@@ -67,13 +67,13 @@ The application leverages Azure AI services (including Azure OpenAI, Azure AI Do
 1. Clone the repository:
    ```
    git clone <repository-url>
-   cd student-ai-assistant
+   cd nova
    ```
 
 2. Create and activate the Conda environment:
    ```
-   conda env create -f student-ai-assistant/environment.yml
-   conda activate student-ai-assistant
+   conda env create -f nova/environment.yml
+   conda activate nova
    ```
 
 3. Set up environment variables:

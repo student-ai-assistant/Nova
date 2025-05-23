@@ -1,4 +1,8 @@
-# Project Requirements Document: Student AI Assistant - User Accounts and Authentication
+---
+title: "Project Requirements Document: Nova"
+---
+
+# Project Requirements Document: Nova
 
 ### 1. Introduction (Supplement)
 

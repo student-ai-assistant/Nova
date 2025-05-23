@@ -1,4 +1,4 @@
-# Project Requirements Document: Student AI Assistant Flask Application
+# Project Requirements Document: Nova Flask Application
 
 ## 1. Introduction
 

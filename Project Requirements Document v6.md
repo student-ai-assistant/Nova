@@ -1,8 +1,8 @@
-# Project Requirements Document: Student AI Assistant - Front Page Redesign
+# Project Requirements Document: Nova
 
-### 1. Introduction (Supplement)
+## 1. Introduction
 
-This document outlines the requirements for a redesign of the Student AI Assistant's front page. The goal is to create a more visually appealing and inviting initial experience for the user, while also adding the capability to provide document context to the general chat for the current session.
+Nova is a Flask-based web application designed to help students with their studies. This document outlines the requirements for a redesign of Nova's front page. The goal is to create a more visually appealing and inviting initial experience for the user, while also adding the capability to provide document context to the general chat for the current session.
 
 ### 2. Goals and Objectives (Supplement)
 

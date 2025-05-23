@@ -1,8 +1,8 @@
-# Project Requirements Document: Student AI Assistant with Persistent Memory and Document Storage
+# Project Requirements Document: Nova
 
-### 1. Introduction
+## 1. Introduction
 
-This document supplements the initial requirements by outlining features for persistent data storage and enhanced conversational memory within the Flask-based Student AI Assistant. Leveraging MongoDB Atlas, the application will store uploaded subject documents and maintain user-specific and subject-specific journal files to provide richer context for the AI agents.
+Nova is a Flask-based web application designed to help students with their studies. This document supplements the initial requirements by outlining features for persistent data storage and enhanced conversational memory within Nova. Leveraging MongoDB Atlas, the application will store uploaded subject documents and maintain user-specific and subject-specific journal files to provide richer context for the AI agents.
 
 ### 2. Goals and Objectives (Supplement)
 
