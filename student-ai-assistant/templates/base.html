@@ -65,6 +65,30 @@
                                 <span>Quiz Generator</span>
                             </a>
                         </li>
+
+                        <!-- Account Section -->
+                        <li class="mt-8 border-t pt-4 border-blue-700">
+                            <div class="text-sm uppercase tracking-wider text-blue-300 mb-2 px-2">Account</div>
+                            {% if current_user.is_authenticated %}
+                            <div class="flex items-center p-2 text-sm mb-2">
+                                <span class="material-icons mr-3">person</span>
+                                <span>{{ current_user.username }}</span>
+                            </div>
+                            <a href="{{ url_for('auth.logout') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors">
+                                <span class="material-icons mr-3">logout</span>
+                                <span>Logout</span>
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('auth.login') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/auth/login' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">login</span>
+                                <span>Login</span>
+                            </a>
+                            <a href="{{ url_for('auth.register') }}" class="flex items-center p-2 rounded-md hover:bg-blue-700 transition-colors {% if '/auth/register' in request.path %}bg-blue-700{% endif %}">
+                                <span class="material-icons mr-3">person_add</span>
+                                <span>Register</span>
+                            </a>
+                            {% endif %}
+                        </li>
                     </ul>
                 </nav>
             </div>
@@ -81,6 +105,29 @@
                     <h2 class="text-xl font-semibold flex items-center">
                         <img src="{{ url_for('static', filename='src/mono-logo-name.svg') }}" alt="Student AI Assistant" class="h-16">
                     </h2>
+                    <!-- Account indicator in header for larger screens -->
+                    <div class="ml-auto hidden md:block">
+                        {% if current_user.is_authenticated %}
+                            <div class="flex items-center">
+                                <span class="text-gray-700 mr-3">{{ current_user.username }}</span>
+                                <a href="{{ url_for('auth.logout') }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+                                    <span class="material-icons text-sm mr-1">logout</span>
+                                    Sign Out
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="flex items-center space-x-4">
+                                <a href="{{ url_for('auth.login') }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+                                    <span class="material-icons text-sm mr-1">login</span>
+                                    Sign In
+                                </a>
+                                <a href="{{ url_for('auth.register') }}" class="text-blue-600 hover:text-blue-800 flex items-center">
+                                    <span class="material-icons text-sm mr-1">person_add</span>
+                                    Register
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </header>
 

@@ -10,6 +10,7 @@ import logging
 import os.path
 import datetime
 import io
+from flask_login import LoginManager, current_user, login_required
 
 # Import our utility modules
 from document_processor import extract_document_text, prepare_document_for_indexing, extract_text_from_pdf
@@ -20,7 +21,8 @@ from motivational_utils import motivational , get_values
 from timetable_agent import TimetableAgentSystem
 from agents.research_agent import run_lit_review
 from agents.quiz_agent import QuizGenerator
-
+from models import User
+from auth import auth_bp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +36,16 @@ app.secret_key = app.config['SECRET_KEY']
 # Configure URL handling - this ensures routes work with or without trailing slashes
 app.url_map.strict_slashes = False
 
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'  # Set the login view
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'error'
+
+# Register the auth blueprint
+app.register_blueprint(auth_bp, url_prefix='/auth')
+
 # Ensure the upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -45,6 +57,12 @@ mongodb_client = None
 timetable_agent_system = None
 # Initialize Quiz Generator (lazy initialization)
 quiz_generator = None
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load a user from the database by ID"""
+    mongo_client = get_mongodb_client()
+    return User.get(user_id, mongo_client)
 
 def get_search_client():
     """Get or initialize the Azure Search client"""
@@ -61,6 +79,9 @@ def get_mongodb_client():
         # Try to establish connection
         mongodb_client.connect()
     return mongodb_client
+
+# Make get_mongodb_client accessible from other modules via app.config
+app.config['get_mongodb_client'] = get_mongodb_client
 
 def get_timetable_agent_system():
     """Get or initialize the Timetable Agent System"""
@@ -153,6 +174,7 @@ def index():
 def general_chat():
     """API endpoint for the general chat functionality"""
     try:
+        user_id = current_user.id if current_user.is_authenticated else None
         session_id = get_session_id()
         user_message = request.json.get('message', '')
         if not user_message:
@@ -178,11 +200,13 @@ def general_chat():
 
         # Retrieve memory journal entries for context
         mongo_client = get_mongodb_client()
-        user_journal_entries = mongo_client.get_user_journal_entries(session_id)
+
+        # Use user_id if authenticated, otherwise fall back to session_id
+        user_journal_entries = mongo_client.get_user_journal_entries(session_id=session_id, user_id=user_id)
         user_memory_context = JournalExtractor.get_memory_context(user_journal_entries)
 
         # Retrieve all subject journal entries for additional context
-        subject_journal_entries = mongo_client.get_all_subject_journal_entries(session_id)
+        subject_journal_entries = mongo_client.get_all_subject_journal_entries(session_id=session_id, user_id=user_id)
         subject_memory_context = JournalExtractor.get_memory_context(subject_journal_entries, max_entries=10)
 
         # Combine all contexts
@@ -213,7 +237,12 @@ def general_chat():
             if unique_contents:
                 # Combine unique content into a single journal entry
                 combined_content = "\n".join(unique_contents)
-                entry_data = JournalExtractor.prepare_journal_entry(combined_content, session_id)
+                # Store user_id if authenticated, otherwise store session_id
+                entry_data = JournalExtractor.prepare_journal_entry(
+                    combined_content,
+                    session_id=session_id if not user_id else None,
+                    user_id=user_id
+                )
                 mongo_client.add_user_journal_entry(entry_data)
 
         return jsonify({"response": response})
@@ -351,56 +380,87 @@ def call_azure_openai(user_message, context=None, is_subject_chat=False, has_fil
 @app.route('/subjects')
 def subjects_list():
     """Render the subjects page with a list of subjects"""
+    user_id = current_user.id if current_user.is_authenticated else None
     session_id = get_session_id()
-    # Get subjects from MongoDB
+
+    # Get subjects from MongoDB filtered by user_id if authenticated
     mongo_client = get_mongodb_client()
-    subjects = mongo_client.get_subjects(session_id)
+    subjects = mongo_client.get_subjects(session_id=session_id, user_id=user_id)
+
     # Fetch documents for each subject to display accurate document counts
     for subject in subjects:
-        documents = mongo_client.get_subject_documents(subject['_id'])
+        documents = mongo_client.get_subject_documents(subject['_id'], user_id=user_id)
         subject['documents'] = documents
+
     return render_template('subjects.html', subjects=subjects)
 
 @app.route('/subjects/add', methods=['POST'])
 def add_subject():
     """Add a new subject"""
+    user_id = current_user.id if current_user.is_authenticated else None
     session_id = get_session_id()
+
     subject_name = request.form.get('subject_name')
     if not subject_name:
         flash('Subject name is required', 'error')
         return redirect(url_for('subjects_list'))
+
     # Create a new subject in MongoDB
     mongo_client = get_mongodb_client()
-    subject_data = {'name': subject_name, 'session_id': session_id}
+
+    # Associate with user_id if authenticated, otherwise use session_id
+    subject_data = {
+        'name': subject_name,
+        'session_id': session_id if not user_id else None,
+        'user_id': user_id
+    }
+
     subject_id = mongo_client.create_subject(subject_data)
     if subject_id:
         flash(f'Subject "{subject_name}" added successfully', 'success')
     else:
         flash('Failed to add subject', 'error')
+
     return redirect(url_for('subjects_list'))
 
 @app.route('/subjects/<subject_id>')
 def subject_detail(subject_id):
     """Render the subject detail page"""
+    user_id = current_user.id if current_user.is_authenticated else None
     session_id = get_session_id()
-    # Get subject from MongoDB
+
+    # Get subject from MongoDB, ensuring it belongs to the current user/session
     mongo_client = get_mongodb_client()
-    subject = mongo_client.get_subject(subject_id)
+    subject = mongo_client.get_subject(subject_id, user_id=user_id)
+
+    # If no subject found with that ID for this user, check if it exists for this session
+    if not subject and not user_id:
+        subject = mongo_client.get_subject(subject_id, session_id=session_id)
+
     if (subject is None):
         flash('Subject not found', 'error')
         return redirect(url_for('subjects_list'))
+
     # Get document metadata from MongoDB
-    documents = mongo_client.get_subject_documents(subject_id)
+    documents = mongo_client.get_subject_documents(subject_id, user_id=user_id)
     subject['documents'] = documents
+
     return render_template('subject_detail.html', subject=subject)
 
 @app.route('/subjects/<subject_id>/upload', methods=['POST'])
 def upload_document(subject_id):
     """Upload one or more documents for a specific subject"""
+    user_id = current_user.id if current_user.is_authenticated else None
     session_id = get_session_id()
-    # Get subject from MongoDB
+
+    # Get subject from MongoDB, ensuring it belongs to the current user/session
     mongo_client = get_mongodb_client()
-    subject = mongo_client.get_subject(subject_id)
+    subject = mongo_client.get_subject(subject_id, user_id=user_id)
+
+    # If no subject found with that ID for this user, check if it exists for this session
+    if not subject and not user_id:
+        subject = mongo_client.get_subject(subject_id, session_id=session_id)
+
     if (subject is None):
         return jsonify({'error': 'Subject not found'}), 404
 
@@ -434,7 +494,14 @@ def upload_document(subject_id):
             # Save the file
             file.save(file_path)
             # Add document metadata to MongoDB
-            document_data = {'filename': filename, 'storage_path': unique_filename, 'subject_id': subject_id, 'session_id': session_id, 'size': os.path.getsize(file_path)}
+            document_data = {
+                'filename': filename,
+                'storage_path': unique_filename,
+                'subject_id': subject_id,
+                'session_id': session_id if not user_id else None,
+                'user_id': user_id,
+                'size': os.path.getsize(file_path)
+            }
             document_id = mongo_client.add_document_metadata(document_data)
             if document_id:
                 document_data['_id'] = document_id
@@ -467,6 +534,50 @@ def upload_document(subject_id):
     else:
         return jsonify({'success': True, 'message': f'{len(uploaded_documents)} documents uploaded successfully', 'documents': uploaded_documents})
 
+# Add document deletion endpoint
+@app.route('/subjects/<subject_id>/documents/<document_id>/delete', methods=['DELETE'])
+@login_required  # Require user login for deletion
+def delete_document(subject_id, document_id):
+    """Delete a document, verifying user ownership first"""
+    user_id = current_user.id
+
+    # Get MongoDB client
+    mongo_client = get_mongodb_client()
+
+    try:
+        # Get document metadata, verifying user ownership
+        document = mongo_client.get_document_by_id(document_id, user_id=user_id)
+
+        if not document:
+            return jsonify({'error': 'Document not found or you do not have permission to delete it'}), 404
+
+        # Verify the document belongs to the specified subject as an additional check
+        if document['subject_id'] != subject_id:
+            return jsonify({'error': 'Document does not belong to the specified subject'}), 400
+
+        # Get the file path
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], document['storage_path'])
+
+        # Delete from MongoDB
+        deleted = mongo_client.delete_document(document_id, user_id)
+
+        if not deleted:
+            return jsonify({'error': 'Failed to delete document from database'}), 500
+
+        # Delete the physical file if it exists
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            logger.info(f"Deleted file: {file_path}")
+        else:
+            logger.warning(f"Physical file not found: {file_path}")
+
+        # Return success
+        return jsonify({'success': True, 'message': 'Document deleted successfully'})
+
+    except Exception as e:
+        logger.error(f"Error deleting document: {str(e)}")
+        return jsonify({'error': f"Failed to delete document: {str(e)}"}), 500
+
 @app.route("/api/motivational")
 def api_reading():
     message = "Please Generate a motivational quote depending on the users mode. Send only the quote in double quotation and the guy who said it afterwards -" \
@@ -479,32 +590,49 @@ def api_reading():
 def subject_chat(subject_id):
     """API endpoint for subject-specific chat functionality"""
     try:
+        user_id = current_user.id if current_user.is_authenticated else None
         session_id = get_session_id()
-        # Verify subject exists in MongoDB
+
+        # Verify subject exists in MongoDB and belongs to the current user/session
         mongo_client = get_mongodb_client()
-        subject = mongo_client.get_subject(subject_id)
+        subject = mongo_client.get_subject(subject_id, user_id=user_id)
+
+        # If no subject found with that ID for this user, check if it exists for this session
+        if not subject and not user_id:
+            subject = mongo_client.get_subject(subject_id, session_id=session_id)
+
         if (subject is None):
             return jsonify({'error': 'Subject not found'}), 404
+
         user_message = request.json.get('message', '')
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
+
         # Use Azure AI Search to retrieve relevant document chunks as context
-        document_context = retrieve_document_context(subject_id, user_message)
+        document_context = retrieve_document_context(subject_id, user_message, user_id)
+
         # Retrieve subject journal entries for additional context
-        journal_entries = mongo_client.get_subject_journal_entries(session_id, subject_id)
+        journal_entries = mongo_client.get_subject_journal_entries(
+            session_id=session_id,
+            subject_id=subject_id,
+            user_id=user_id
+        )
         journal_context = JournalExtractor.get_memory_context(journal_entries)
+
         # Combine document and journal context with better formatting
         combined_context = ''
         if document_context:
             combined_context += '### DOCUMENT INFORMATION ###\n' + document_context + '\n\n'
         if journal_context:
             combined_context += '### PREVIOUS CONVERSATION INFORMATION ###\n' + journal_context + '\n\n'
+
         # Add a instruction if both contexts are present
         if document_context and journal_context:
             combined_context += 'Please use both document information and previous conversation context to provide a comprehensive answer.\n\n'
         # Add a title for empty context
         elif (not combined_context):
             combined_context = 'No relevant information found.'
+
         # Call Azure OpenAI with the combined context
         response = call_azure_openai(user_message, combined_context, is_subject_chat=True)
 
@@ -520,7 +648,12 @@ def subject_chat(subject_id):
             if unique_contents:
                 # Combine unique content into a single journal entry
                 combined_content = "\n".join(unique_contents)
-                entry_data = JournalExtractor.prepare_journal_entry(combined_content, session_id, subject_id)
+                entry_data = JournalExtractor.prepare_journal_entry(
+                    combined_content,
+                    session_id=session_id if not user_id else None,
+                    user_id=user_id,
+                    subject_id=subject_id
+                )
                 mongo_client.add_subject_journal_entry(entry_data)
 
         return jsonify({'response': response})
@@ -528,10 +661,15 @@ def subject_chat(subject_id):
         logger.error(f"Error in subject chat: {str(e)}")
         return jsonify({'error': 'An error occurred processing your request'}), 500
 
-def retrieve_document_context(subject_id, query):
+def retrieve_document_context(subject_id, query, user_id=None):
     """
     Retrieve relevant document content from Azure AI Search based on the query
     If Azure AI Search is not available, fall back to direct document extraction
+
+    Args:
+        subject_id: Subject ID
+        query: User's query
+        user_id: Optional user ID for filtering documents
     """
     try:
         # Log the incoming query for debugging
@@ -553,7 +691,7 @@ def retrieve_document_context(subject_id, query):
 
             # First try to use Azure AI Search
             if search_client.is_available:
-                context = get_relevant_context(search_client, search_query, subject_id)
+                context = get_relevant_context(search_client, search_query, subject_id, user_id=user_id)
                 # If we got a meaningful context, return it
                 if context and not context.startswith("Error") and not context.startswith("Azure AI Search is not available"):
                     return context
@@ -562,7 +700,7 @@ def retrieve_document_context(subject_id, query):
 
         # Fall back to direct document extraction (either Azure Search is unavailable or failed)
         mongo_client = get_mongodb_client()
-        documents = mongo_client.get_subject_documents(subject_id)
+        documents = mongo_client.get_subject_documents(subject_id, user_id=user_id)
 
         if not documents:
             return 'No documents available for this subject yet.'
@@ -634,38 +772,56 @@ def extract_search_terms(query, max_terms=5):
 @app.route('/timetable')
 def timetable():
     """Render the timetable generation page"""
+    user_id = current_user.id if current_user.is_authenticated else None
     session_id = get_session_id()
+
     # Get subjects from MongoDB to populate the subject dropdown
     mongo_client = get_mongodb_client()
-    subjects = mongo_client.get_subjects(session_id)
+    subjects = mongo_client.get_subjects(session_id=session_id, user_id=user_id)
+
     # Fetch documents for each subject to display accurate document counts
     for subject in subjects:
-        documents = mongo_client.get_subject_documents(subject['_id'])
+        documents = mongo_client.get_subject_documents(subject['_id'], user_id=user_id)
         subject['documents'] = documents
+
     return render_template('timetable.html', subjects=subjects)
 
 @app.route('/api/timetable/extract_topics', methods=['POST'])
 def extract_topics():
     """API endpoint for extracting topics from subject documents (Agent 1)"""
     try:
+        user_id = current_user.id if current_user.is_authenticated else None
         session_id = get_session_id()
+
         subject_id = request.json.get('subject_id')
         scope = request.json.get('scope', 'all topics')
+
         if not subject_id:
             return jsonify({"error": "Subject ID is required"}), 400
-        # Get subject from MongoDB
+
+        # Get subject from MongoDB, ensuring it belongs to the current user/session
         mongo_client = get_mongodb_client()
-        subject = mongo_client.get_subject(subject_id)
+        subject = mongo_client.get_subject(subject_id, user_id=user_id)
+
+        # If no subject found with that ID for this user, check if it exists for this session
+        if not subject and not user_id:
+            subject = mongo_client.get_subject(subject_id, session_id=session_id)
+
         if (subject is None):
             return jsonify({"error": "Subject not found"}), 404
+
         # Get document metadata from MongoDB
-        documents = mongo_client.get_subject_documents(subject_id)
+        documents = mongo_client.get_subject_documents(subject_id, user_id=user_id)
+
         if (not documents):
             return jsonify({"error": "No documents found for this subject"}), 404
+
         # Initialize timetable agent system
         timetable_system = get_timetable_agent_system()
+
         # Extract topics from documents using Agent 1
         extraction_results = timetable_system.extract_topics_from_documents(documents=documents, upload_folder=app.config['UPLOAD_FOLDER'], scope=scope)
+
         return jsonify({'success': True, 'subject': subject, 'extraction_results': extraction_results})
     except Exception as e:
         logger.error(f"Error extracting topics: {str(e)}")
@@ -675,23 +831,40 @@ def extract_topics():
 def generate_timetable():
     """API endpoint for generating a study timetable using the multi-agent workflow"""
     try:
+        user_id = current_user.id if current_user.is_authenticated else None
         session_id = get_session_id()
+
         subject_id = request.json.get('subject_id')
         extracted_topics = request.json.get('extracted_topics')
         timeframe = request.json.get('timeframe')
+
         if (not subject_id) or (not extracted_topics) or (not timeframe):
             return jsonify({"error": "Subject ID, extracted topics, and timeframe are required"}), 400
-        # Get subject from MongoDB
+
+        # Get subject from MongoDB, ensuring it belongs to the current user/session
         mongo_client = get_mongodb_client()
-        subject = mongo_client.get_subject(subject_id)
+        subject = mongo_client.get_subject(subject_id, user_id=user_id)
+
+        # If no subject found with that ID for this user, check if it exists for this session
+        if not subject and not user_id:
+            subject = mongo_client.get_subject(subject_id, session_id=session_id)
+
         if (subject is None):
             return jsonify({"error": "Subject not found"}), 404
+
         # Get user's journal entries for Agent 3
-        user_journal_entries = mongo_client.get_user_journal_entries(session_id, limit=30)
+        user_journal_entries = mongo_client.get_user_journal_entries(
+            session_id=session_id if not user_id else None,
+            user_id=user_id,
+            limit=30
+        )
+
         # Initialize timetable agent system
         timetable_system = get_timetable_agent_system()
+
         # Generate timetable using the multi-agent workflow
         timetable_results = timetable_system.generate_timetable(extracted_topics=extracted_topics, journal_entries=user_journal_entries, timeframe=timeframe)
+
         return jsonify({'success': True, 'subject': subject, 'timetable_results': timetable_results})
     except Exception as e:
         logger.error(f"Error generating timetable: {str(e)}")
@@ -759,35 +932,46 @@ def generate_literature_review():
 @app.route('/quiz')
 def quiz():
     """Render the quiz generation page with subject selection"""
+    user_id = current_user.id if current_user.is_authenticated else None
     session_id = get_session_id()
+
     # Get subjects from MongoDB to populate the subject dropdown
     mongo_client = get_mongodb_client()
-    subjects = mongo_client.get_subjects(session_id)
+    subjects = mongo_client.get_subjects(session_id=session_id, user_id=user_id)
+
     # Fetch documents for each subject to display accurate document counts
     for subject in subjects:
-        documents = mongo_client.get_subject_documents(subject['_id'])
+        documents = mongo_client.get_subject_documents(subject['_id'], user_id=user_id)
         subject['documents'] = documents
+
     return render_template('quiz.html', subjects=subjects)
 
 @app.route('/api/quiz/generate', methods=['POST'])
 def generate_quiz():
     """API endpoint for generating a quiz based on subject documents and topic"""
     try:
+        user_id = current_user.id if current_user.is_authenticated else None
         session_id = get_session_id()
+
         subject_id = request.json.get('subject_id')
         topic = request.json.get('topic')
 
         if not subject_id or not topic:
             return jsonify({"error": "Subject ID and topic are required"}), 400
 
-        # Get subject from MongoDB
+        # Get subject from MongoDB, ensuring it belongs to the current user/session
         mongo_client = get_mongodb_client()
-        subject = mongo_client.get_subject(subject_id)
+        subject = mongo_client.get_subject(subject_id, user_id=user_id)
+
+        # If no subject found with that ID for this user, check if it exists for this session
+        if not subject and not user_id:
+            subject = mongo_client.get_subject(subject_id, session_id=session_id)
+
         if subject is None:
             return jsonify({"error": "Subject not found"}), 404
 
         # Get document metadata from MongoDB
-        documents = mongo_client.get_subject_documents(subject_id)
+        documents = mongo_client.get_subject_documents(subject_id, user_id=user_id)
         if not documents:
             return jsonify({"error": "No documents found for this subject"}), 404
 

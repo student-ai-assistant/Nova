@@ -23,6 +23,8 @@ dependencies:
       - markdown         # For processing .md files
       - pymongo          # For MongoDB Atlas integration
       - icalendar        # For generating iCalendar (.ics) files
+      - flask-login      # For user authentication
+      - passlib[bcrypt]  # For secure password hashing
 
       # From requirements.txt (with specified versions)
       - autogen-agentchat==0.4.8.1
