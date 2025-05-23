@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # General application configuration
-DEBUG = True
+# Set DEBUG mode based on FLASK_ENV. Defaults to False (production) if FLASK_ENV is not 'development'.
+DEBUG = os.getenv('FLASK_ENV') == 'development'
 SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Azure OpenAI configuration

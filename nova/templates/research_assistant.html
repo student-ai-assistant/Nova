@@ -30,7 +30,7 @@
             transform: rotate(360deg);
         }
     }
-    
+
     /* Enhanced Markdown styling */
     #report-content {
         line-height: 1.7;
@@ -150,7 +150,7 @@
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
         <h1 class="text-2xl font-bold mb-4">Literature Review Generator</h1>
         <p class="mb-4">Enter a query to generate a literature review. The system will search for relevant academic papers and create a comprehensive literature review report.</p>
-        
+
         <div class="mb-6">
             <form id="lit-review-form">
                 <div class="mb-4">
@@ -165,14 +165,14 @@
             </form>
         </div>
     </div>
-    
+
     <!-- Loading indicator -->
     <div id="loading-container" class="hidden bg-white rounded-lg shadow-md p-6 mb-6 text-center">
         <div class="loading mx-auto"></div>
         <p class="mt-4 text-lg font-medium">Generating literature review...</p>
         <p class="text-gray-600">This may take several minutes. Please be patient.</p>
     </div>
-    
+
     <!-- Report display -->
     <div id="report-container" class="hidden bg-white rounded-lg shadow-md p-6">
         <div class="flex justify-between items-center mb-6">
@@ -200,7 +200,7 @@
         const reportContainer = document.getElementById('report-container');
         const reportContent = document.getElementById('report-content');
         const downloadButton = document.getElementById('download-report');
-        
+
         // Configure marked.js for better rendering
         marked.setOptions({
             breaks: true,            // Interpret line breaks as <br>
@@ -212,22 +212,22 @@
             smartypants: true,       // Use "smart" typographic punctuation
             xhtml: true              // Self-close HTML tags
         });
-        
+
         let reportData = null; // Variable to store the report content
-        
+
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const query = document.getElementById('query').value.trim();
             if (!query) {
                 alert('Please enter a research query.');
                 return;
             }
-            
+
             // Show loading indicator, hide report container
             loadingContainer.classList.remove('hidden');
             reportContainer.classList.add('hidden');
-            
+
             try {
                 const response = await fetch('/api/research-assistant/generate', {
                     method: 'POST',
@@ -236,24 +236,24 @@
                     },
                     body: JSON.stringify({ query: query })
                 });
-                
+
                 const data = await response.json();
-                
+
                 // Hide loading indicator
                 loadingContainer.classList.add('hidden');
-                
+
                 if (response.ok) {
                     // Show report container and populate with content
                     reportContainer.classList.remove('hidden');
-                    
+
                     // Use marked.js to render Markdown
                     if (data.report) {
                         reportData = data.report; // Store report for download
                         reportContent.innerHTML = marked.parse(data.report);
-                        
+
                         // Handle specific elements after rendering
                         enhanceReportDisplay();
-                        
+
                         // Scroll to report
                         reportContainer.scrollIntoView({ behavior: 'smooth' });
                     } else {
@@ -268,7 +268,7 @@
                 console.error('Error:', error);
             }
         });
-        
+
         // Function to enhance the display of the rendered report
         function enhanceReportDisplay() {
             // Add classes to tables
@@ -280,7 +280,7 @@
                 const tableCells = table.querySelectorAll('td');
                 tableCells.forEach(td => td.classList.add('p-2', 'border', 'border-gray-200'));
             });
-            
+
             // Add classes to links
             const links = reportContent.querySelectorAll('a');
             links.forEach(link => {
@@ -291,35 +291,35 @@
                     link.setAttribute('rel', 'noopener noreferrer');
                 }
             });
-            
+
             // Add classes to images
             const images = reportContent.querySelectorAll('img');
             images.forEach(img => {
                 img.classList.add('mx-auto', 'rounded-lg', 'shadow-sm');
                 img.setAttribute('loading', 'lazy');
             });
-            
+
             // Add classes to blockquotes
             const blockquotes = reportContent.querySelectorAll('blockquote');
             blockquotes.forEach(quote => {
                 quote.classList.add('italic');
             });
-            
+
             // Add classes to code blocks
             const codeBlocks = reportContent.querySelectorAll('pre code');
             codeBlocks.forEach(code => {
                 code.parentElement.classList.add('text-sm', 'rounded-md', 'overflow-auto');
             });
         }
-        
+
         // Download report as markdown file
         downloadButton.addEventListener('click', function() {
             if (!reportData) return;
-            
+
             const blob = new Blob([reportData], { type: 'text/markdown;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            
+
             // Create filename from the first line of the report
             let filename = 'literature-review.md';
             const firstLine = reportData.split('\n')[0];
@@ -329,7 +329,7 @@
                                     .replace(/[^\w\-]/g, '') // Remove special characters
                                     .toLowerCase() + '.md';
             }
-            
+
             a.href = url;
             a.download = filename;
             document.body.appendChild(a);

@@ -1,17 +1,15 @@
 import os
-os.environ['LLAMA_CLOUD_API_KEY'] = 'llx-57leIBOeFARXE4hPwJoADhfgXK8uaWiA3FmVbXQ82QXLT478'
-os.environ['TOGETHER_API_KEY'] = '714ebaca2e6f19ceac63a29def9a8c0186eae4b61e7498185cf900d45c1f1902'
-os.environ['GROQ_API_KEY'] = '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'
+from dotenv import load_dotenv
+
+load_dotenv() # Load environment variables from .env file
 
 
 
 
-import os
-from getpass import getpass
 import urllib3
 import json
-import os
 import warnings
+import re # Add re import for sanitization
 
 urllib3.disable_warnings()
 
@@ -19,12 +17,14 @@ urllib3.disable_warnings()
 warnings.filterwarnings("ignore", category=UserWarning, module='pdfminer.pdfpage')
 
 def get_api_key(key_name):
-    if key_name in os.environ:
-        return os.environ[key_name]
-    else:
-        key = getpass(f'Enter {key_name}: ')
-        os.environ[key_name] = key
+    # API keys are now loaded from .env by load_dotenv()
+    # and are available as environment variables via os.getenv()
+    key = os.getenv(key_name)
+    if key:
         return key
+    else:
+        # Fallback or error handling if key is not found
+        raise ValueError(f"{key_name} not found in environment variables or .env file.")
 
 
 LLAMA_CLOUD_API_KEY = get_api_key('LLAMA_CLOUD_API_KEY')
@@ -166,15 +166,34 @@ def get_papers(query: str, num_papers: int):
 
     for paper in query_semantic_scholar(query, NUM_SEARCH_RESULTS):
         try:
-            fname = paper['title'].replace(' ', '_')
+            # Sanitize the paper title for use as a directory name
+            # Keep alphanumeric, underscore, hyphen. Replace others with underscore.
+            sanitized_title = re.sub(r'[^a-zA-Z0-9_]', '_', paper['title'])
+            # Replace multiple consecutive underscores with a single one
+            sanitized_title = re.sub(r'_+', '_', sanitized_title)
+            # Remove leading/trailing underscores
+            sanitized_title = sanitized_title.strip('_')
+
+            fname = sanitized_title # Use the sanitized title
             paper_folder = os.path.join(PAPER_SAVE_DIR, fname)
             os.makedirs(paper_folder, exist_ok=True)
             out_path = os.path.join(paper_folder, f"paper.pdf")
             download_pdf(requests.Session(), paper['openAccessPdf']['url'], out_path)
 
         except Exception as e:
-            os.rmdir(paper_folder)
-            print(f"Failed to download {paper['title']}: {e}")
+            # Attempt to remove the directory if an error occurred after its creation
+            if 'paper_folder' in locals() and os.path.exists(paper_folder):
+                try:
+                    # Check if the directory is empty before removing
+                    if not os.listdir(paper_folder):
+                        os.rmdir(paper_folder)
+                    else:
+                        # If not empty, perhaps log or handle differently,
+                        # for now, we'll print a message.
+                        print(f"Directory {paper_folder} is not empty, not removing.")
+                except OSError as oe:
+                    print(f"Error removing directory {paper_folder}: {oe}")
+            print(f"Failed to download or process {paper.get('title', 'Unknown Title')}: {e}")
             continue
 
         if REMOVE_REFERENCE_SECTION_FROM_PDF:
@@ -671,7 +690,6 @@ class FeedbackHandlerAgent(RoutedAgent):
                 await self.publish_message(Termination(reason="Reached maximum number of messages"), DefaultTopicId())
 
             await self.publish_message(Message(display_msg=None, hidden_content={}), topic_id=TopicId(user_agent_type, source=self.id.key))
-
 
 
 

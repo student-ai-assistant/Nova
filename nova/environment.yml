@@ -37,3 +37,4 @@ dependencies:
 
       # Additional package requested
       - llama_cloud_services
+      - gunicorn # For production WSGI server
