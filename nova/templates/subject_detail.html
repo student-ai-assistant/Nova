@@ -51,11 +51,15 @@
                     <div id="documents-list" class="space-y-3">
                         {% if subject.documents and subject.documents|length > 0 %}
                             {% for doc in subject.documents %}
-                                <div class="border rounded-lg p-3 flex items-center">
-                                    <span class="material-icons text-gray-500 mr-3">description</span>
+                                <div id="document-{{ doc._id|string }}" class="border rounded-lg p-3 flex items-center justify-between">
                                     <div class="flex-1 truncate">
                                         <p class="font-medium" title="{{ doc.filename }}">{{ doc.filename }}</p>
                                     </div>
+                                    <button onclick="confirmAndDeleteDocument('{{ subject._id|string }}', '{{ doc._id|string }}', '{{ doc.filename }}', 'document-{{ doc._id|string }}')"
+                                            class="text-red-500 hover:text-red-700 focus:outline-none"
+                                            title="Delete document {{ doc.filename }}">
+                                        <span class="material-icons" style="font-size: 1.25rem;">delete</span>
+                                    </button>
                                 </div>
                             {% endfor %}
                         {% else %}

@@ -4,13 +4,14 @@ import json
 import base64
 import tempfile
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash, send_file, Response
-from werkzeug.utils import secure_filename
 import requests
 import logging
 import os.path
 import datetime
 import io
 from flask_login import LoginManager, current_user, login_required
+from bson import ObjectId, errors
+from werkzeug.utils import secure_filename
 
 # Import our utility modules
 from document_processor import extract_document_text, prepare_document_for_indexing, extract_text_from_pdf
@@ -535,48 +536,89 @@ def upload_document(subject_id):
         return jsonify({'success': True, 'message': f'{len(uploaded_documents)} documents uploaded successfully', 'documents': uploaded_documents})
 
 # Add document deletion endpoint
-@app.route('/subjects/<subject_id>/documents/<document_id>/delete', methods=['DELETE'])
-@login_required  # Require user login for deletion
-def delete_document(subject_id, document_id):
-    """Delete a document, verifying user ownership first"""
-    user_id = current_user.id
-
-    # Get MongoDB client
+@app.route('/api/subjects/<subject_id>/documents/<document_id>/delete', methods=['DELETE'])
+@login_required
+def delete_document_route(subject_id, document_id):
     mongo_client = get_mongodb_client()
-
     try:
-        # Get document metadata, verifying user ownership
-        document = mongo_client.get_document_by_id(document_id, user_id=user_id)
+        if not ObjectId.is_valid(document_id):
+            # Reduced logging for common client error
+            return jsonify({"success": False, "message": "Invalid document ID format."}), 400
+
+        try:
+            doc_object_id = ObjectId(document_id)
+        except errors.InvalidId: # Catch specific BSON error
+            # Reduced logging for common client error
+            return jsonify({"success": False, "message": "Invalid document ID format."}), 400
+
+        # Main query to find the document, ensuring it belongs to the user and subject
+        document = mongo_client.db.documents.find_one({
+            "_id": doc_object_id,
+            "subject_id": subject_id,
+            "user_id": current_user.id # Direct use of current_user.id as @login_required handles auth
+        })
 
         if not document:
-            return jsonify({'error': 'Document not found or you do not have permission to delete it'}), 404
+            # Reduced logging for common client error
+            return jsonify({"success": False, "message": "Document not found or permission denied"}), 404
 
-        # Verify the document belongs to the specified subject as an additional check
-        if document['subject_id'] != subject_id:
-            return jsonify({'error': 'Document does not belong to the specified subject'}), 400
+        storage_path = document.get("storage_path")
+        full_storage_path = None
+        file_deleted_physically = False
 
-        # Get the file path
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], document['storage_path'])
+        if storage_path:
+            if not os.path.isabs(storage_path):
+                full_storage_path = os.path.join(app.config['UPLOAD_FOLDER'], storage_path)
+            else:
+                full_storage_path = storage_path
 
-        # Delete from MongoDB
-        deleted = mongo_client.delete_document(document_id, user_id)
-
-        if not deleted:
-            return jsonify({'error': 'Failed to delete document from database'}), 500
-
-        # Delete the physical file if it exists
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            logger.info(f"Deleted file: {file_path}")
+            if os.path.exists(full_storage_path):
+                try:
+                    os.remove(full_storage_path)
+                    file_deleted_physically = True
+                    logger.info(f"Successfully deleted physical file: {full_storage_path} for user {current_user.id}")
+                except OSError as e_os:
+                    logger.error(f"Error deleting physical file {full_storage_path} for user {current_user.id}: {e_os.strerror}") # Keep log for OS error
+            else:
+                logger.warning(f"Physical file not found at {full_storage_path} for user {current_user.id}. Skipping physical deletion.") # Keep log for unexpected state
         else:
-            logger.warning(f"Physical file not found: {file_path}")
+            logger.info(f"No 'storage_path' in metadata for document _id={doc_object_id}, user {current_user.id}. No physical file to delete.")
 
-        # Return success
-        return jsonify({'success': True, 'message': 'Document deleted successfully'})
 
+        # Delete the document metadata from MongoDB
+        delete_result = mongo_client.db.documents.delete_one({
+            "_id": doc_object_id,
+            "user_id": current_user.id # Ensure user owns the document for deletion
+        })
+
+        if delete_result.deleted_count == 1:
+            logger.info(f"Successfully deleted document metadata for _id={doc_object_id}, user {current_user.id}") # Keep log for successful DB operation
+            message = "Document deleted successfully."
+            if storage_path: # If there was an expectation of a physical file
+                if not file_deleted_physically:
+                    # Refine message if physical file deletion had issues
+                    if full_storage_path and os.path.exists(full_storage_path): # File still exists after attempt
+                        message = "Document metadata deleted, but the corresponding physical file could not be removed. Please check server logs."
+                    elif full_storage_path: # File was expected but not found
+                        message = "Document metadata deleted. The corresponding physical file was not found on the server."
+            elif not storage_path: # No storage_path from the start
+                message = "Document metadata deleted. No physical file was associated with this record."
+            return jsonify({"success": True, "message": message}), 200
+        else:
+            # Document was found by find_one but delete_one reported 0 deleted.
+            logger.warning(f"Failed to delete document metadata for _id={doc_object_id}, user_id={current_user.id}. Deleted count: {delete_result.deleted_count}")
+            still_exists_check = mongo_client.db.documents.find_one({"_id": doc_object_id, "user_id": current_user.id})
+            if not still_exists_check:
+                return jsonify({"success": False, "message": "Document metadata was already deleted or no longer accessible."}), 410 # HTTP 410 Gone
+            else:
+                return jsonify({"success": False, "message": "Failed to delete document metadata. Please try again."}), 500
+
+    except errors.InvalidId:
+        logger.error(f"Invalid ObjectId format for document_id: {document_id} in delete_document_route", exc_info=True) # Keep log for this specific exception type
+        return jsonify({"success": False, "message": "Invalid document ID format."}), 400
     except Exception as e:
-        logger.error(f"Error deleting document: {str(e)}")
-        return jsonify({'error': f"Failed to delete document: {str(e)}"}), 500
+        logger.error(f"Unexpected error in delete_document_route for doc_id {document_id}, user {current_user.id}: {str(e)}", exc_info=True) # Keep log for any other exception
+        return jsonify({"success": False, "message": "An unexpected error occurred."}), 500
 
 @app.route("/api/motivational")
 def api_reading():
