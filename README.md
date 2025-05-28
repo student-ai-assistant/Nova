@@ -2,6 +2,12 @@
 
 A Flask-based web application designed to help students with their studies through intelligent AI assistance, document-based learning, personalized study plans, research assistance, and quiz generation.
 
+## Demo
+
+![Nova Demo](screencaps/preview.gif)
+
+*Preview of Nova in action - showcasing general chat with file uploads, subject-specific document management, AI-powered study assistance, timetable generation, literature reviews, and interactive quiz creation.*
+
 ## Overview
 
 The Nova provides an intuitive platform for students to:
